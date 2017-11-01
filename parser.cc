@@ -41,8 +41,8 @@ class Parser {
     int num_nest;
   };
 
-  typedef void (Parser::*DirectiveHandler)(
-      StringPiece line, StringPiece directive);
+  typedef void (Parser::*DirectiveHandler)(StringPiece line,
+                                           StringPiece directive);
   typedef unordered_map<StringPiece, DirectiveHandler> DirectiveMap;
 
  public:
@@ -54,8 +54,7 @@ class Parser {
         num_define_nest_(0),
         num_if_nest_(0),
         loc_(filename, 0),
-        fixed_lineno_(false) {
-  }
+        fixed_lineno_(false) {}
 
   Parser(StringPiece buf, const Loc& loc, vector<Stmt*>* stmts)
       : buf_(buf),
@@ -64,11 +63,9 @@ class Parser {
         out_stmts_(stmts),
         num_if_nest_(0),
         loc_(loc),
-        fixed_lineno_(true) {
-  }
+        fixed_lineno_(true) {}
 
-  ~Parser() {
-  }
+  ~Parser() {}
 
   void Parse() {
     l_ = 0;
@@ -92,10 +89,10 @@ class Parser {
     }
 
     if (!if_stack_.empty())
-      ERROR("%s:%d: *** missing `endif'.", loc_.filename, loc_.lineno + 1);
+      ERROR_LOC(Loc(loc_.filename, loc_.lineno + 1), "*** missing `endif'.");
     if (!define_name_.empty())
-      ERROR("%s:%d: *** missing `endef', unterminated `define'.",
-            loc_.filename, define_start_line_);
+      ERROR_LOC(Loc(loc_.filename, define_start_line_),
+                "*** missing `endef', unterminated `define'.");
   }
 
   static void Init() {
@@ -134,9 +131,7 @@ class Parser {
     }
   }
 
-  static void Quit() {
-    delete make_directives_;
-  }
+  static void Quit() { delete make_directives_; }
 
   void set_state(ParserState st) { state_ = st; }
 
@@ -197,8 +192,8 @@ class Parser {
       ParseRule(line, string::npos);
     } else if (line[sep] == '=') {
       ParseAssign(line, sep);
-    } else if (line.get(sep+1) == '=') {
-      ParseAssign(line, sep+1);
+    } else if (line.get(sep + 1) == '=') {
+      ParseAssign(line, sep + 1);
     } else if (line[sep] == ':') {
       ParseRule(line, sep);
     } else {
@@ -301,10 +296,10 @@ class Parser {
       return;
     }
 
-    StringPiece rest = TrimRightSpace(RemoveComment(TrimLeftSpace(
-        line.substr(sizeof("endef")))));
+    StringPiece rest = TrimRightSpace(
+        RemoveComment(TrimLeftSpace(line.substr(sizeof("endef")))));
     if (!rest.empty()) {
-      WARN("%s:%d: extraneous text after `endef' directive", LOCF(loc_));
+      WARN_LOC(loc_, "extraneous text after `endef' directive");
     }
 
     AssignStmt* stmt = new AssignStmt();
@@ -352,7 +347,7 @@ class Parser {
       stmt->lhs = ParseExprImpl(loc_, s, terms, ParseExprOpt::NORMAL, &n, true);
       if (s[n] != ',')
         return false;
-      s = TrimLeftSpace(s.substr(n+1));
+      s = TrimLeftSpace(s.substr(n + 1));
       stmt->rhs = ParseExprImpl(loc_, s, NULL, ParseExprOpt::NORMAL, &n);
       s = TrimLeftSpace(s.substr(n));
     } else {
@@ -370,11 +365,11 @@ class Parser {
           stmt->lhs = v;
         else
           stmt->rhs = v;
-        s = TrimLeftSpace(s.substr(end+1));
+        s = TrimLeftSpace(s.substr(end + 1));
       }
     }
     if (!s.empty()) {
-      WARN("%s:%d: extraneous text after `ifeq' directive", LOCF(loc_));
+      WARN_LOC(loc_, "extraneous text after `ifeq' directive");
       return true;
     }
     return true;
@@ -411,7 +406,7 @@ class Parser {
 
     num_if_nest_ = st->num_nest + 1;
     if (!HandleDirective(next_if, else_if_directives_)) {
-      WARN("%s:%d: extraneous text after `else' directive", LOCF(loc_));
+      WARN_LOC(loc_, "extraneous text after `else' directive");
     }
     num_if_nest_ = 0;
   }
@@ -453,10 +448,9 @@ class Parser {
   }
 
   void ParseOverride(StringPiece line, StringPiece) {
-    current_directive_ =
-        static_cast<AssignDirective>(
-            (static_cast<int>(current_directive_) |
-             static_cast<int>(AssignDirective::OVERRIDE)));
+    current_directive_ = static_cast<AssignDirective>(
+        (static_cast<int>(current_directive_) |
+         static_cast<int>(AssignDirective::OVERRIDE)));
     if (HandleDirective(line, assign_directives_))
       return;
     if (IsInExport()) {
@@ -466,10 +460,9 @@ class Parser {
   }
 
   void ParseExport(StringPiece line, StringPiece) {
-    current_directive_ =
-        static_cast<AssignDirective>(
-            (static_cast<int>(current_directive_) |
-             static_cast<int>(AssignDirective::EXPORT)));
+    current_directive_ = static_cast<AssignDirective>(
+        (static_cast<int>(current_directive_) |
+         static_cast<int>(AssignDirective::EXPORT)));
     if (HandleDirective(line, assign_directives_))
       return;
     CreateExport(line, true);
@@ -509,8 +502,8 @@ class Parser {
     if (found == directive_map->end())
       return false;
 
-    StringPiece rest = TrimRightSpace(RemoveComment(TrimLeftSpace(
-        line.substr(directive.size()))));
+    StringPiece rest = TrimRightSpace(
+        RemoveComment(TrimLeftSpace(line.substr(directive.size()))));
     (this->*found->second)(rest, directive);
     return true;
   }
@@ -545,8 +538,7 @@ class Parser {
 
 void Parse(Makefile* mk) {
   COLLECT_STATS("parse file time");
-  Parser parser(StringPiece(mk->buf()),
-                mk->filename().c_str(),
+  Parser parser(StringPiece(mk->buf()), mk->filename().c_str(),
                 mk->mutable_stmts());
   parser.Parse();
 }
@@ -557,7 +549,8 @@ void Parse(StringPiece buf, const Loc& loc, vector<Stmt*>* out_stmts) {
   parser.Parse();
 }
 
-void ParseNotAfterRule(StringPiece buf, const Loc& loc,
+void ParseNotAfterRule(StringPiece buf,
+                       const Loc& loc,
                        vector<Stmt*>* out_stmts) {
   Parser parser(buf, loc, out_stmts);
   parser.set_state(ParserState::NOT_AFTER_RULE);
@@ -579,12 +572,15 @@ size_t Parser::shortest_directive_len_;
 size_t Parser::longest_directive_len_;
 vector<ParseErrorStmt*> Parser::parse_errors;
 
-void ParseAssignStatement(StringPiece line, size_t sep,
-                          StringPiece* lhs, StringPiece* rhs, AssignOp* op) {
+void ParseAssignStatement(StringPiece line,
+                          size_t sep,
+                          StringPiece* lhs,
+                          StringPiece* rhs,
+                          AssignOp* op) {
   CHECK(sep != 0);
   *op = AssignOp::EQ;
   size_t lhs_end = sep;
-  switch (line[sep-1]) {
+  switch (line[sep - 1]) {
     case ':':
       lhs_end--;
       *op = AssignOp::COLON_EQ;

@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "fileutil.h"
+// +build ignore
+
 #include <benchmark/benchmark.h>
 #include <cstdio>
+#include "fileutil.h"
 
 static void BM_RunCommand(benchmark::State& state) {
   std::string shell = "/bin/bash";

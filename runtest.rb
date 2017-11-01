@@ -170,13 +170,15 @@ def normalize_kati_log(output)
   output.gsub!(/\/bin\/sh: ([^:]*): command not found/,
                "\\1: Command not found")
   output.gsub!(/.*: warning for parse error in an unevaluated line: .*\n/, '')
-  output.gsub!(/^FindEmulator: /, '')
+  output.gsub!(/^([^ ]+: )?FindEmulator: /, '')
   output.gsub!(/^\/bin\/sh: line 0: /, '')
   output.gsub!(/ (\.\/+)+kati\.\S+/, '') # kati log files in find_command.mk
   output.gsub!(/ (\.\/+)+test\S+.json/, '') # json files in find_command.mk
   # Normalization for "include foo" with Go kati.
   output.gsub!(/(: )open (\S+): n(o such file or directory)\nNOTE:.*/,
                "\\1\\2: N\\3")
+  # Bionic libc has different error messages than glibc
+  output.gsub!(/Too many symbolic links encountered/, 'Too many levels of symbolic links')
   output
 end
 

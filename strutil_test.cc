@@ -56,6 +56,20 @@ void TestHasSuffix() {
   assert(!HasSuffix("bar", "bbar"));
 }
 
+void TestTrimPrefix() {
+  ASSERT_EQ(TrimPrefix("foo", "foo"), "");
+  ASSERT_EQ(TrimPrefix("foo", "fo"), "o");
+  ASSERT_EQ(TrimPrefix("foo", ""), "foo");
+  ASSERT_EQ(TrimPrefix("foo", "fooo"), "foo");
+}
+
+void TestTrimSuffix() {
+  ASSERT_EQ(TrimSuffix("bar", "bar"), "");
+  ASSERT_EQ(TrimSuffix("bar", "ar"), "b");
+  ASSERT_EQ(TrimSuffix("bar", ""), "bar");
+  ASSERT_EQ(TrimSuffix("bar", "bbar"), "bar");
+}
+
 string SubstPattern(StringPiece str, StringPiece pat, StringPiece subst) {
   string r;
   Pattern(pat).AppendSubst(str, subst, &r);
@@ -146,8 +160,8 @@ void TestFindEndOfLine() {
 // freeing the allocated pages.
 const char* CreateProtectedString(const char* str) {
   int pagesize = sysconf(_SC_PAGE_SIZE);
-  void *buffer;
-  char *buffer_str;
+  void* buffer;
+  char* buffer_str;
 
   // Allocate two pages of memory
   if (posix_memalign(&buffer, pagesize, pagesize * 2) != 0) {
@@ -190,6 +204,8 @@ int main() {
   TestWordScanner();
   TestHasPrefix();
   TestHasSuffix();
+  TestTrimPrefix();
+  TestTrimSuffix();
   TestSubstPattern();
   TestNoLineBreak();
   TestHasWord();
