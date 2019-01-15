@@ -148,10 +148,7 @@ struct RuleMerger {
   bool is_double_colon;
 
   RuleMerger()
-      : primary_rule(nullptr),
-        parent(nullptr),
-        parent_sym(Symbol::IsUninitialized()),
-        is_double_colon(false) {}
+      : primary_rule(nullptr), parent(nullptr), is_double_colon(false) {}
 
   void AddImplicitOutput(Symbol output, RuleMerger* merger) {
     implicit_outputs.push_back(make_pair(output, merger));
@@ -167,7 +164,7 @@ struct RuleMerger {
                 "*** implicit output `%s' of `%s' was already defined by `%s' "
                 "at %s:%d",
                 output.c_str(), p.c_str(), parent_sym.c_str(),
-                parent->primary_rule->cmd_loc());
+                LOCF(parent->primary_rule->cmd_loc()));
     }
     if (primary_rule) {
       ERROR_LOC(primary_rule->cmd_loc(),
@@ -268,8 +265,7 @@ DepNode::DepNode(Symbol o, bool p, bool r)
       is_restat(r),
       rule_vars(NULL),
       depfile_var(NULL),
-      ninja_pool_var(NULL),
-      output_pattern(Symbol::IsUninitialized()) {
+      ninja_pool_var(NULL) {
   g_dep_node_pool->push_back(this);
 }
 
@@ -281,7 +277,6 @@ class DepBuilder {
       : ev_(ev),
         rule_vars_(rule_vars),
         implicit_rules_(new RuleTrie()),
-        first_rule_(Symbol::IsUninitialized{}),
         depfile_var_name_(Intern(".KATI_DEPFILE")),
         implicit_outputs_var_name_(Intern(".KATI_IMPLICIT_OUTPUTS")),
         ninja_pool_var_name_(Intern(".KATI_NINJA_POOL")) {
@@ -347,7 +342,7 @@ class DepBuilder {
       targets.push_back(first_rule_);
     }
     if (g_flags.gen_all_targets) {
-      unordered_set<Symbol> non_root_targets;
+      SymbolSet non_root_targets;
       for (const auto& p : rules_) {
         if (p.first.get(0) == '.')
           continue;
@@ -361,7 +356,7 @@ class DepBuilder {
 
       for (const auto& p : rules_) {
         Symbol t = p.first;
-        if (!non_root_targets.count(t) && t.get(0) != '.') {
+        if (!non_root_targets.exists(t) && t.get(0) != '.') {
           targets.push_back(p.first);
         }
       }
@@ -373,7 +368,7 @@ class DepBuilder {
       cur_rule_vars_.reset(new Vars);
       ev_->set_current_scope(cur_rule_vars_.get());
       DepNode* n = BuildPlan(target, Intern(""));
-      nodes->push_back({target,n});
+      nodes->push_back({target, n});
       ev_->set_current_scope(NULL);
       cur_rule_vars_.reset(NULL);
     }
@@ -381,12 +376,8 @@ class DepBuilder {
 
  private:
   bool Exists(Symbol target) {
-    auto found = rules_.find(target);
-    if (found != rules_.end())
-      return true;
-    if (phony_.count(target))
-      return true;
-    return ::Exists(target.str());
+    return (rules_.find(target) != rules_.end()) || phony_.exists(target) ||
+           ::Exists(target.str());
   }
 
   bool GetRuleInputs(Symbol s, vector<Symbol>* o, Loc* l) {
@@ -519,7 +510,7 @@ class DepBuilder {
                            Symbol output,
                            DepNode* n,
                            shared_ptr<Rule>* out_rule) {
-    Symbol matched(Symbol::IsUninitialized{});
+    Symbol matched;
     for (Symbol output_pattern : rule->output_patterns) {
       Pattern pat(output_pattern.str());
       if (pat.Match(output.str())) {
@@ -643,7 +634,7 @@ class DepBuilder {
     }
 
     DepNode* n =
-        new DepNode(output, phony_.count(output), restat_.count(output));
+        new DepNode(output, phony_.exists(output), restat_.exists(output));
     done_[output] = n;
 
     const RuleMerger* rule_merger = nullptr;
@@ -669,9 +660,9 @@ class DepBuilder {
     if (vars) {
       for (const auto& p : *vars) {
         Symbol name = p.first;
-        RuleVar* var = reinterpret_cast<RuleVar*>(p.second);
+        Var* var = p.second;
         CHECK(var);
-        Var* new_var = var->v();
+        Var* new_var = var;
         if (var->op() == AssignOp::PLUS_EQ) {
           Var* old_var = ev_->LookupVar(name);
           if (old_var->IsDefined()) {
@@ -792,7 +783,7 @@ class DepBuilder {
 
     for (Symbol input : n->actual_order_only_inputs) {
       DepNode* c = BuildPlan(input, output);
-      n->order_onlys.push_back({input,c});
+      n->order_onlys.push_back({input, c});
     }
 
     n->has_rule = true;
@@ -820,8 +811,8 @@ class DepBuilder {
 
   Symbol first_rule_;
   unordered_map<Symbol, DepNode*> done_;
-  unordered_set<Symbol> phony_;
-  unordered_set<Symbol> restat_;
+  SymbolSet phony_;
+  SymbolSet restat_;
   Symbol depfile_var_name_;
   Symbol implicit_outputs_var_name_;
   Symbol ninja_pool_var_name_;

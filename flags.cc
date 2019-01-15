@@ -82,6 +82,8 @@ void Flags::Parse(int argc, char** argv) {
       enable_kati_warnings = true;
     } else if (!strcmp(arg, "--ninja")) {
       generate_ninja = true;
+    } else if (!strcmp(arg, "--empty_ninja_file")) {
+      generate_empty_ninja = true;
     } else if (!strcmp(arg, "--gen_all_targets")) {
       gen_all_targets = true;
     } else if (!strcmp(arg, "--regen")) {
@@ -102,6 +104,8 @@ void Flags::Parse(int argc, char** argv) {
       color_warnings = true;
     } else if (!strcmp(arg, "--no_builtin_rules")) {
       no_builtin_rules = true;
+    } else if (!strcmp(arg, "--no_ninja_prelude")) {
+      no_ninja_prelude = true;
     } else if (!strcmp(arg, "--werror_find_emulator")) {
       werror_find_emulator = true;
     } else if (!strcmp(arg, "--werror_overriding_commands")) {

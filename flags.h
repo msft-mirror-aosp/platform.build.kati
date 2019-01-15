@@ -32,6 +32,7 @@ struct Flags {
   bool enable_stat_logs;
   bool gen_all_targets;
   bool generate_ninja;
+  bool generate_empty_ninja;
   bool is_dry_run;
   bool is_silent_mode;
   bool is_syntax_check_only;
@@ -41,6 +42,7 @@ struct Flags {
   bool use_find_emulator;
   bool color_warnings;
   bool no_builtin_rules;
+  bool no_ninja_prelude;
   bool werror_find_emulator;
   bool werror_overriding_commands;
   bool warn_implicit_rules;
