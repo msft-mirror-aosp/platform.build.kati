@@ -283,9 +283,10 @@ void WordsFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
 
 void FirstwordFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   const string&& text = args[0]->Eval(ev);
-  for (StringPiece tok : WordScanner(text)) {
-    AppendString(tok, s);
-    return;
+  WordScanner ws(text);
+  auto begin = ws.begin();
+  if (begin != ws.end()) {
+    AppendString(*begin, s);
   }
 }
 
@@ -589,6 +590,7 @@ void ShellFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
     cr->cmd = cmd;
     cr->find.reset(fc);
     cr->result = out;
+    cr->loc = ev->loc();
     g_command_results.push_back(cr);
   }
   *s += out;
@@ -711,6 +713,7 @@ static void FileReadFunc(Evaluator* ev, const string& filename, string* s) {
         CommandResult* cr = new CommandResult();
         cr->op = CommandOp::READ_MISSING;
         cr->cmd = filename;
+        cr->loc = ev->loc();
         g_command_results.push_back(cr);
       }
       return;
@@ -744,6 +747,7 @@ static void FileReadFunc(Evaluator* ev, const string& filename, string* s) {
     CommandResult* cr = new CommandResult();
     cr->op = CommandOp::READ;
     cr->cmd = filename;
+    cr->loc = ev->loc();
     g_command_results.push_back(cr);
   }
   *s += out;
@@ -771,6 +775,7 @@ static void FileWriteFunc(Evaluator* ev,
     cr->op = CommandOp::WRITE;
     cr->cmd = filename;
     cr->result = text;
+    cr->loc = ev->loc();
     g_command_results.push_back(cr);
   }
 }
