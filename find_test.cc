@@ -77,7 +77,7 @@ void CompareFind(const string& cmd) {
   }
   string emulated;
   if (!FindEmulator::Get()->HandleFind(cmd, fc, Loc(), &emulated)) {
-    fprintf(stderr, "Find emulator cannot parse `%s`\n", cmd.c_str());
+    fprintf(stderr, "Find emulator cannot handle `%s`\n", cmd.c_str());
     exit(1);
   }
 
@@ -109,8 +109,6 @@ void CompareFind(const string& cmd) {
 }
 
 void ExpectParseFailure(const string& cmd) {
-  Run(cmd);
-
   FindCommand fc;
   if (fc.Parse(cmd)) {
     fprintf(stderr, "Expected parse failure for `%s`\n", cmd.c_str());
@@ -131,6 +129,7 @@ int FindUnitTests() {
   //  drwxr-x--- top
   //  lrwxrwxrwx top/E -> missing
   //  lrwxrwxrwx top/C -> A
+  //  lrwxrwxrwx top/F -> A/B
   //  -rw-r----- top/a
   //  drwxr-x--- top/A
   //  lrwxrwxrwx top/A/D -> B
@@ -141,6 +140,7 @@ int FindUnitTests() {
   Run("cd top && ln -s A C");
   Run("cd top/A && ln -s B D");
   Run("cd top && ln -s missing E");
+  Run("cd top && ln -s A/B F");
   Run("touch top/a top/A/b top/A/B/z");
 
   InitFindEmulator();
@@ -152,6 +152,9 @@ int FindUnitTests() {
   CompareFind("find top/C/.");
   CompareFind("find -L top/C");
   CompareFind("find -L top/C/.");
+
+  // A file in finddir
+  CompareFind("find top/A/b");
 
   CompareFind("cd top && find C");
   CompareFind("cd top && find -L C");
@@ -165,7 +168,24 @@ int FindUnitTests() {
   CompareFind("find top \\! -name 'a*'");
   CompareFind("find top \\( -name 'a*' \\)");
 
+  // Basic use of ..
+  CompareFind("cd top/C; find ../A");
+
+  // Use of .. in chdir
+  CompareFind("cd top/A/..; find .");
+
+  // .. through a symlink in chdir, should list under top/A/...
+  CompareFind("cd top/F; find ../");
+  // .. through a symlink in finddir, should do the same
+  CompareFind("cd top; find F/..");
+
+  // * in a finddir
+  CompareFind("find top/*/B");
+
   ExpectParseFailure("find top -name a\\*");
+
+  // * in a chdir is not supported
+  ExpectParseFailure("cd top/*/B && find .");
 
   return unit_test_failed ? 1 : 0;
 }
