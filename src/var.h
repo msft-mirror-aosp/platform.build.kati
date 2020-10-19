@@ -22,6 +22,7 @@
 
 #include "eval.h"
 #include "expr.h"
+#include "loc.h"
 #include "log.h"
 #include "stmt.h"
 #include "string_piece.h"
@@ -51,7 +52,9 @@ class Var : public Evaluable {
 
   virtual const char* Flavor() const = 0;
 
-  VarOrigin Origin() { return origin_; }
+  VarOrigin Origin() const { return origin_; }
+  Frame* Definition() const { return definition_; }
+
   virtual bool IsDefined() const { return true; }
 
   virtual void AppendVar(Evaluator* ev, Value* v);
@@ -69,10 +72,13 @@ class Var : public Evaluable {
   bool Obsolete() const { return obsolete_; }
   void SetObsolete(const StringPiece& msg);
 
+  bool SelfReferential() const { return self_referential_; }
+  void SetSelfReferential() { self_referential_ = true; }
+
   const string& DeprecatedMessage() const;
 
   // This variable was used (either written or read from)
-  void Used(Evaluator* ev, const Symbol& sym) const;
+  virtual void Used(Evaluator* ev, const Symbol& sym) const;
 
   AssignOp op() const { return assign_op_; }
   void SetAssignOp(AssignOp op) { assign_op_ = op; }
@@ -81,14 +87,18 @@ class Var : public Evaluable {
 
  protected:
   Var();
-  explicit Var(VarOrigin origin);
+  Var(VarOrigin origin, Frame* definition, Loc loc);
+
+  Frame* definition_;
 
  private:
   const VarOrigin origin_;
+
   AssignOp assign_op_;
   bool readonly_ : 1;
   bool deprecated_ : 1;
   bool obsolete_ : 1;
+  bool self_referential_ : 1;
 
   const char* diagnostic_message_text() const;
 
@@ -97,9 +107,13 @@ class Var : public Evaluable {
 
 class SimpleVar : public Var {
  public:
-  explicit SimpleVar(VarOrigin origin);
-  SimpleVar(const string& v, VarOrigin origin);
-  SimpleVar(VarOrigin, Evaluator* ev, Value* v);
+  explicit SimpleVar(VarOrigin origin, Frame* definition, Loc loc);
+  SimpleVar(const string& v, VarOrigin origin, Frame* definition, Loc loc);
+  SimpleVar(VarOrigin origin,
+            Frame* definition,
+            Loc loc,
+            Evaluator* ev,
+            Value* v);
 
   virtual const char* Flavor() const override { return "simple"; }
 
@@ -111,13 +125,16 @@ class SimpleVar : public Var {
 
   virtual string DebugString() const override;
 
- private:
   string v_;
 };
 
 class RecursiveVar : public Var {
  public:
-  RecursiveVar(Value* v, VarOrigin origin, StringPiece orig);
+  RecursiveVar(Value* v,
+               VarOrigin origin,
+               Frame* definition,
+               Loc loc,
+               StringPiece orig);
 
   virtual const char* Flavor() const override { return "recursive"; }
 
@@ -129,7 +146,8 @@ class RecursiveVar : public Var {
 
   virtual string DebugString() const override;
 
- private:
+  virtual void Used(Evaluator* ev, const Symbol& sym) const override;
+
   Value* v_;
   StringPiece orig_;
 };

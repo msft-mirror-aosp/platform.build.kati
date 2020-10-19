@@ -28,6 +28,7 @@ class Rule;
 class Value;
 class Var;
 class Vars;
+class Frame;
 
 typedef pair<Symbol, struct DepNode*> NamedDepNode;
 

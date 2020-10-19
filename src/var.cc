@@ -45,10 +45,16 @@ const char* GetOriginStr(VarOrigin origin) {
   return "*** broken origin ***";
 }
 
-Var::Var() : Var(VarOrigin::UNDEFINED) {}
+Var::Var() : Var(VarOrigin::UNDEFINED, nullptr, Loc()) {}
 
-Var::Var(VarOrigin origin)
-    : origin_(origin), readonly_(false), deprecated_(false), obsolete_(false) {}
+Var::Var(VarOrigin origin, Frame* definition, Loc loc)
+    : Evaluable(loc),
+      definition_(definition),
+      origin_(origin),
+      readonly_(false),
+      deprecated_(false),
+      obsolete_(false),
+      self_referential_(false) {}
 
 Var::~Var() {
   diagnostic_messages_.erase(this);
@@ -97,11 +103,21 @@ Var* Var::Undefined() {
   return undefined_var;
 }
 
-SimpleVar::SimpleVar(VarOrigin origin) : Var(origin) {}
+SimpleVar::SimpleVar(VarOrigin origin, Frame* definition, Loc loc)
+    : Var(origin, definition, loc) {}
 
-SimpleVar::SimpleVar(const string& v, VarOrigin origin) : Var(origin), v_(v) {}
+SimpleVar::SimpleVar(const string& v,
+                     VarOrigin origin,
+                     Frame* definition,
+                     Loc loc)
+    : Var(origin, definition, loc), v_(v) {}
 
-SimpleVar::SimpleVar(VarOrigin origin, Evaluator* ev, Value* v) : Var(origin) {
+SimpleVar::SimpleVar(VarOrigin origin,
+                     Frame* definition,
+                     Loc loc,
+                     Evaluator* ev,
+                     Value* v)
+    : Var(origin, definition, loc) {
   v->Eval(ev, &v_);
 }
 
@@ -115,6 +131,7 @@ void SimpleVar::AppendVar(Evaluator* ev, Value* v) {
   v->Eval(ev, &buf);
   v_.push_back(' ');
   v_ += buf;
+  definition_ = ev->CurrentFrame();
 }
 
 StringPiece SimpleVar::String() const {
@@ -125,8 +142,12 @@ string SimpleVar::DebugString() const {
   return v_;
 }
 
-RecursiveVar::RecursiveVar(Value* v, VarOrigin origin, StringPiece orig)
-    : Var(origin), v_(v), orig_(orig) {}
+RecursiveVar::RecursiveVar(Value* v,
+                           VarOrigin origin,
+                           Frame* definition,
+                           Loc loc,
+                           StringPiece orig)
+    : Var(origin, definition, loc), v_(v), orig_(orig) {}
 
 void RecursiveVar::Eval(Evaluator* ev, string* s) const {
   ev->CheckStack();
@@ -135,7 +156,21 @@ void RecursiveVar::Eval(Evaluator* ev, string* s) const {
 
 void RecursiveVar::AppendVar(Evaluator* ev, Value* v) {
   ev->CheckStack();
-  v_ = Value::NewExpr(v_, Value::NewLiteral(" "), v);
+  v_ = Value::NewExpr(v->Location(), v_, Value::NewLiteral(" "), v);
+  definition_ = ev->CurrentFrame();
+}
+
+void RecursiveVar::Used(Evaluator* ev, const Symbol& sym) const {
+  if (SelfReferential()) {
+    ERROR_LOC(
+        Location(),
+        StringPrintf(
+            "*** Recursive variable \"%s\" references itself (eventually).",
+            sym.c_str())
+            .c_str());
+  }
+
+  Var::Used(ev, sym);
 }
 
 StringPiece RecursiveVar::String() const {
