@@ -27,6 +27,8 @@ struct Flags {
   bool detect_android_echo;
   bool detect_depfiles;
   bool dump_kati_stamp;
+  const char* dump_include_graph;
+  const char* dump_variable_assignment_trace;
   bool enable_debug;
   bool enable_kati_warnings;
   bool enable_stat_logs;
@@ -44,6 +46,7 @@ struct Flags {
   bool no_builtin_rules;
   bool no_ninja_prelude;
   bool use_ninja_phony_output;
+  bool use_ninja_symlink_outputs;
   bool use_ninja_validations;
   bool werror_find_emulator;
   bool werror_overriding_commands;

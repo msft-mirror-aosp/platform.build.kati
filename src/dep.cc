@@ -142,6 +142,7 @@ bool IsSuffixRule(Symbol output) {
 struct RuleMerger {
   vector<const Rule*> rules;
   vector<pair<Symbol, RuleMerger*>> implicit_outputs;
+  vector<Symbol> symlink_outputs;
   vector<Symbol> validations;
   const Rule* primary_rule;
   const RuleMerger* parent;
@@ -154,6 +155,8 @@ struct RuleMerger {
   void AddImplicitOutput(Symbol output, RuleMerger* merger) {
     implicit_outputs.push_back(make_pair(output, merger));
   }
+
+  void AddSymlinkOutput(Symbol output) { symlink_outputs.push_back(output); }
 
   void AddValidation(Symbol validation) { validations.push_back(validation); }
 
@@ -249,11 +252,23 @@ struct RuleMerger {
         n->loc = r->loc;
     }
 
+    SymbolSet all_outputs = SymbolSet();
+    all_outputs.insert(output);
+
     for (auto& implicit_output : implicit_outputs) {
       n->implicit_outputs.push_back(implicit_output.first);
+      all_outputs.insert(implicit_output.first);
       for (const Rule* r : implicit_output.second->rules) {
         FillDepNodeFromRule(output, r, n);
       }
+    }
+
+    for (auto& symlink_output : symlink_outputs) {
+      if (!all_outputs.exists(symlink_output)) {
+        ERROR_LOC(primary_rule->cmd_loc(), "*** undeclared symlink output: %s",
+                  symlink_output.c_str());
+      }
+      n->symlink_outputs.push_back(symlink_output);
     }
 
     for (auto& validation : validations) {
@@ -286,6 +301,7 @@ class DepBuilder {
         implicit_rules_(new RuleTrie()),
         depfile_var_name_(Intern(".KATI_DEPFILE")),
         implicit_outputs_var_name_(Intern(".KATI_IMPLICIT_OUTPUTS")),
+        symlink_outputs_var_name_(Intern(".KATI_SYMLINK_OUTPUTS")),
         ninja_pool_var_name_(Intern(".KATI_NINJA_POOL")),
         validations_var_name_(Intern(".KATI_VALIDATIONS")) {
     ScopedTimeReporter tr("make dep (populate)");
@@ -439,6 +455,17 @@ class DepBuilder {
         for (StringPiece validation : WordScanner(validations)) {
           Symbol sym = Intern(TrimLeadingCurdir(validation));
           p.second.AddValidation(sym);
+        }
+      }
+
+      var = vars->Lookup(symlink_outputs_var_name_);
+      if (var->IsDefined()) {
+        string symlink_outputs;
+        var->Eval(ev_, &symlink_outputs);
+
+        for (StringPiece output : WordScanner(symlink_outputs)) {
+          Symbol sym = Intern(TrimLeadingCurdir(output));
+          p.second.AddSymlinkOutput(sym);
         }
       }
     }
@@ -615,12 +642,12 @@ class DepBuilder {
 
     StringPiece output_suffix = GetExt(output.str());
     if (output_suffix.get(0) != '.')
-      return rule_merger;
+      return rule_merger != nullptr;
     output_suffix = output_suffix.substr(1);
 
     SuffixRuleMap::const_iterator found = suffix_rules_.find(output_suffix);
     if (found == suffix_rules_.end())
-      return rule_merger;
+      return rule_merger != nullptr;
 
     for (const shared_ptr<Rule>& irule : found->second) {
       CHECK(irule->inputs.size() == 1);
@@ -629,7 +656,7 @@ class DepBuilder {
         continue;
 
       *pattern_rule = irule;
-      if (rule_merger)
+      if (rule_merger != nullptr)
         return true;
       if (vars) {
         CHECK(irule->outputs.size() == 1);
@@ -639,7 +666,7 @@ class DepBuilder {
       return true;
     }
 
-    return rule_merger;
+    return rule_merger != nullptr;
   }
 
   DepNode* BuildPlan(Symbol output, Symbol needed_by UNUSED) {
@@ -668,12 +695,15 @@ class DepBuilder {
         return n;
       }
     }
+
     if (rule_merger)
       rule_merger->FillDepNode(output, pattern_rule.get(), n);
     else
       RuleMerger().FillDepNode(output, pattern_rule.get(), n);
 
     vector<unique_ptr<ScopedVar>> sv;
+    ScopedFrame frame(ev_->Enter(FrameType::DEPENDENCY, output.str(), n->loc));
+
     if (vars) {
       for (const auto& p : *vars) {
         Symbol name = p.first;
@@ -689,7 +719,8 @@ class DepBuilder {
             if (!s->empty())
               *s += ' ';
             new_var->Eval(ev_, s.get());
-            new_var = new SimpleVar(*s, old_var->Origin());
+            new_var =
+                new SimpleVar(*s, old_var->Origin(), frame.Current(), n->loc);
           }
         } else if (var->op() == AssignOp::QUESTION_EQ) {
           Var* old_var = ev_->LookupVar(name);
@@ -818,6 +849,12 @@ class DepBuilder {
       n->validations.push_back({validation, c});
     }
 
+    if (!g_flags.use_ninja_symlink_outputs && !n->symlink_outputs.empty()) {
+      ERROR_LOC(n->loc,
+                ".KATI_SYMLINK_OUTPUTS not allowed without "
+                "--use_ninja_symlink_outputs");
+    }
+
     // Block on werror_writable/werror_phony_looks_real, because otherwise we
     // can't rely on is_phony being valid for this check.
     if (!n->is_phony && n->cmds.empty() && g_flags.werror_writable &&
@@ -894,6 +931,7 @@ class DepBuilder {
   SymbolSet restat_;
   Symbol depfile_var_name_;
   Symbol implicit_outputs_var_name_;
+  Symbol symlink_outputs_var_name_;
   Symbol ninja_pool_var_name_;
   Symbol validations_var_name_;
 };

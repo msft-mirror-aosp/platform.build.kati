@@ -15,7 +15,9 @@
 #ifndef EVAL_H_
 #define EVAL_H_
 
+#include <map>
 #include <memory>
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -32,10 +34,97 @@ class Rule;
 class Var;
 class Vars;
 
+class IncludeGraph;
+
+enum FrameType {
+  ROOT,        // Root node. Exactly one of this exists.
+  PHASE,       // Markers for various phases of the execution.
+  PARSE,       // Initial evaluation pass: include, := variables, etc.
+  CALL,        // Evaluating the result of a function call
+  FUNCALL,     // Evaluating a function call (not its result)
+  STATEMENT,   // Denotes individual statements for better location reporting
+  DEPENDENCY,  // Dependency analysis. += requires variable expansion here.
+  EXEC,        // Execution phase. Expansoin of = and rule-specific variables.
+  NINJA,       // Ninja file generation
+};
+
+class Frame {
+ public:
+  // for the top-level Makefile
+  Frame(FrameType type, Frame* parent, Loc loc, const std::string& name);
+
+  ~Frame();
+
+  FrameType Type() const { return type_; }
+  Frame* Parent() const { return parent_; }
+  const string& Name() const { return name_; }
+  const Loc& Location() const { return location_; }
+  const std::vector<std::unique_ptr<Frame>>& Children() const {
+    return children_;
+  }
+
+  void PrintJSONTrace(FILE* f, int indent) const;
+
+  void Add(std::unique_ptr<Frame> child);
+
+ private:
+  FrameType type_;
+  Frame* parent_;
+  std::string name_;
+  Loc location_;
+  std::vector<std::unique_ptr<Frame>> children_;
+};
+
+class ScopedFrame {
+ public:
+  ScopedFrame(Evaluator* ev, Frame* frame);
+  // We only allow moving; copying would double stack frames
+  ScopedFrame(const ScopedFrame& other) = delete;
+  ScopedFrame& operator=(const ScopedFrame&) = delete;
+  ScopedFrame(ScopedFrame&& other);
+  ~ScopedFrame();
+
+  Frame* Current() const { return frame_; }
+
+ private:
+  Evaluator* ev_;
+  Frame* frame_;
+};
+
+class IncludeGraphNode {
+  friend IncludeGraph;
+
+ public:
+  IncludeGraphNode(const Frame* frame);
+  ~IncludeGraphNode();
+
+ private:
+  std::string filename_;
+  std::set<std::string> includes_;
+};
+
+class IncludeGraph {
+ public:
+  IncludeGraph();
+  ~IncludeGraph();
+
+  void DumpJSON(FILE* output);
+  void MergeTreeNode(const Frame* frame);
+
+ private:
+  std::map<std::string, std::unique_ptr<IncludeGraphNode>> nodes_;
+  std::vector<const Frame*> include_stack_;
+};
+
 class Evaluator {
+  friend ScopedFrame;
+
  public:
   Evaluator();
   ~Evaluator();
+
+  bool Start();
+  void Finish();
 
   void EvalAssign(const AssignStmt* stmt);
   void EvalRule(const RuleStmt* stmt);
@@ -44,9 +133,11 @@ class Evaluator {
   void EvalInclude(const IncludeStmt* stmt);
   void EvalExport(const ExportStmt* stmt);
 
+  Var* LookupVarForEval(Symbol name);
   Var* LookupVar(Symbol name);
   // For target specific variables.
   Var* LookupVarInCurrentScope(Symbol name);
+  void VarEvalComplete(Symbol name);
 
   // Equivalent to LookupVar, but doesn't mark as used.
   Var* PeekVar(Symbol name);
@@ -62,8 +153,9 @@ class Evaluator {
 
   void Error(const string& msg);
 
-  void set_is_bootstrap(bool b) { is_bootstrap_ = b; }
-  void set_is_commandline(bool c) { is_commandline_ = c; }
+  void in_bootstrap();
+  void in_command_line();
+  void in_toplevel_makefile();
 
   void set_current_scope(Vars* v) { current_scope_ = v; }
 
@@ -84,6 +176,11 @@ class Evaluator {
   void IncrementEvalDepth() { eval_depth_++; }
   void DecrementEvalDepth() { eval_depth_--; }
 
+  ScopedFrame Enter(FrameType frame_type, const string& name, Loc loc);
+  Frame* CurrentFrame() const {
+    return stack_.empty() ? nullptr : stack_.back();
+  };
+
   string GetShell();
   string GetShellFlag();
   string GetShellAndFlag();
@@ -95,7 +192,9 @@ class Evaluator {
       lowest_loc_ = loc_;
     }
   }
+
   void DumpStackStats() const;
+  void DumpIncludeJSON(const string& filename) const;
 
   bool ExportDeprecated() const { return export_message_ && !export_error_; };
   bool ExportObsolete() const { return export_error_; };
@@ -120,6 +219,7 @@ class Evaluator {
                bool* needs_assign);
   void DoInclude(const string& fname);
 
+  void TraceVariableLookup(const char* operation, Symbol name, Var* var);
   Var* LookupVarGlobal(Symbol name);
 
   // Equivalent to LookupVarInCurrentScope, but doesn't mark as used.
@@ -135,6 +235,7 @@ class Evaluator {
   unordered_map<Symbol, Vars*> rule_vars_;
   vector<const Rule*> rules_;
   unordered_map<Symbol, bool> exports_;
+  std::set<Symbol> symbols_for_eval_;
 
   Rule* last_rule_;
   Vars* current_scope_;
@@ -142,6 +243,11 @@ class Evaluator {
   Loc loc_;
   bool is_bootstrap_;
   bool is_commandline_;
+
+  bool trace_;
+  std::vector<Frame*> stack_;
+  FILE* assignment_tracefile_;
+  long int assignment_count_;
 
   std::vector<Loc> include_stack_;
 

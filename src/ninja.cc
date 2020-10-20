@@ -232,6 +232,8 @@ class NinjaGenerator {
       return;
     }
     done_.insert(node->output);
+    ScopedFrame frame(ce_.evaluator()->Enter(FrameType::NINJA,
+                                             node->output.str(), node->loc));
 
     // A hack to exclude out phony target in Android. If this exists,
     // "ninja -t clean" tries to remove this directory and fails.
@@ -580,6 +582,14 @@ class NinjaGenerator {
     }
 
     *o << "\n";
+
+    if (!node->symlink_outputs.empty()) {
+      *o << " symlink_outputs =";
+      for (auto const& s : node->symlink_outputs) {
+        *o << " " << EscapeBuildTarget(s);
+      }
+      *o << "\n";
+    }
 
     string pool;
     if (node->ninja_pool_var) {

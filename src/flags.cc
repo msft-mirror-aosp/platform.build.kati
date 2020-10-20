@@ -108,6 +108,8 @@ void Flags::Parse(int argc, char** argv) {
       no_ninja_prelude = true;
     } else if (!strcmp(arg, "--use_ninja_phony_output")) {
       use_ninja_phony_output = true;
+    } else if (!strcmp(arg, "--use_ninja_symlink_outputs")) {
+      use_ninja_symlink_outputs = true;
     } else if (!strcmp(arg, "--use_ninja_validations")) {
       use_ninja_validations = true;
     } else if (!strcmp(arg, "--werror_find_emulator")) {
@@ -146,6 +148,11 @@ void Flags::Parse(int argc, char** argv) {
     } else if (!strcmp(arg, "--werror_real_no_cmds")) {
       warn_real_no_cmds = true;
       werror_real_no_cmds = true;
+    } else if (ParseCommandLineOptionWithArg("--dump_include_graph", argv, &i,
+                                             &dump_include_graph)) {
+    } else if (ParseCommandLineOptionWithArg("--dump_variable_assignment_trace",
+                                             argv, &i,
+                                             &dump_variable_assignment_trace)) {
     } else if (ParseCommandLineOptionWithArg("-j", argv, &i, &num_jobs_str)) {
       num_jobs = strtol(num_jobs_str, NULL, 10);
       if (num_jobs <= 0) {
