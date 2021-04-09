@@ -70,7 +70,7 @@ cc_binary_host {
     whole_static_libs: ["libckati"],
     target: {
         linux_glibc: {
-            shared_libs: ["libjemalloc"],
+            shared_libs: ["libjemalloc5"],
         },
     },
 }
