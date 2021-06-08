@@ -90,7 +90,6 @@ cc_test_host {
         "find_test.cc",
         "ninja_test.cc",
         "string_piece_test.cc",
-        "strutil_bench.cc",
         "strutil_test.cc",
     ],
     gtest: false,
@@ -102,6 +101,15 @@ cc_benchmark_host {
     defaults: ["ckati_defaults"],
     srcs: [
         "fileutil_bench.cc",
+    ],
+    static_libs: ["libckati"],
+}
+
+cc_test_host {
+    name: "ckati_strutil_bench",
+    defaults: ["ckati_defaults"],
+    srcs: [
+        "strutil_bench.cc",
     ],
     static_libs: ["libckati"],
 }
