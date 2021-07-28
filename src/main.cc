@@ -76,8 +76,8 @@ static void ReadBootstrapMakefile(const vector<Symbol>& targets,
        "CXX?=g++\n"
 #endif
        "AR?=ar\n"
-       // Pretend to be GNU make 3.81, for compatibility.
-       "MAKE_VERSION?=3.81\n"
+       // Pretend to be GNU make 4.2.1, for compatibility.
+       "MAKE_VERSION?=4.2.1\n"
        "KATI?=ckati\n"
        // Overwrite $SHELL environment variable.
        "SHELL=/bin/sh\n"
@@ -384,6 +384,11 @@ int main(int argc, char* argv[]) {
     orig_args += argv[i];
   }
   g_flags.Parse(argc, argv);
+  if (g_flags.working_dir) {
+    int ret = chdir(g_flags.working_dir);
+    if (ret != 0)
+      ERROR("*** %s: %s", g_flags.working_dir, strerror(errno));
+  }
   FindFirstMakefie();
   if (g_flags.makefile == NULL)
     ERROR("*** No targets specified and no makefile found.");

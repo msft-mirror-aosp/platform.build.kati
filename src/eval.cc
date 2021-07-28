@@ -16,6 +16,7 @@
 
 #include "eval.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -388,12 +389,12 @@ static string FormatRuleError(const string& before_term) {
   while (start < size && isspace(before_term[start])) {
     start++;
   }
-  size_t end = size; // we already handled length == 0
-  while (end > start
-      && (isspace(before_term[end - 1]) || before_term[end - 1] == ':')) {
+  size_t end = size;  // we already handled length == 0
+  while (end > start &&
+         (isspace(before_term[end - 1]) || before_term[end - 1] == ':')) {
     end--;
   }
-  return before_term.substr(start, end-start);
+  return before_term.substr(start, end - start);
 }
 
 void Evaluator::MarkVarsReadonly(Value* vars_list) {
@@ -466,7 +467,7 @@ void Evaluator::EvalRule(const RuleStmt* stmt) {
 
   const string&& before_term = stmt->lhs->Eval(this);
   // See semicolon.mk.
-  if (before_term.find_first_not_of(" \t;") == string::npos) {
+  if (before_term.find_first_not_of(" \t\n;") == string::npos) {
     if (stmt->sep == RuleStmt::SEP_SEMICOLON)
       Error("*** missing rule before commands.");
     return;
@@ -532,14 +533,14 @@ void Evaluator::EvalRule(const RuleStmt* stmt) {
   switch (GetAllowRules()) {
     case RULES_WARNING:
       WARN_LOC(loc_, "warning: Rule not allowed here for target: %s",
-          FormatRuleError(before_term).c_str());
+               FormatRuleError(before_term).c_str());
       break;
     case RULES_ERROR:
       PrintIncludeStack();
       ERROR_LOC(loc_, "*** Rule not allowed here for target: %s",
-          FormatRuleError(before_term).c_str());
+                FormatRuleError(before_term).c_str());
       break;
-    default: // RULES_ALLOWED
+    default:  // RULES_ALLOWED
       break;
   }
 
@@ -574,8 +575,10 @@ void Evaluator::EvalIf(const IfStmt* stmt) {
       string var_name;
       stmt->lhs->Eval(this, &var_name);
       Symbol lhs = Intern(TrimRightSpace(var_name));
-      if (lhs.str().find_first_of(" \t") != string::npos)
+      if (const auto& s = lhs.str();
+          std::find_if(s.begin(), s.end(), ::isspace) != s.end()) {
         Error("*** invalid syntax in conditional.");
+      }
       Var* v = LookupVarInCurrentScope(lhs);
       v->Used(this, lhs);
       is_true = (v->String().empty() == (stmt->op == CondOp::IFNDEF));
