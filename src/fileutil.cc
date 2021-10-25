@@ -132,7 +132,7 @@ int RunCommand(const string& shell,
   }
 }
 
-void GetExecutablePath(string* path) {
+std::string GetExecutablePath() {
 #if defined(__linux__)
   char mypath[PATH_MAX + 1];
   ssize_t l = readlink("/proc/self/exe", mypath, PATH_MAX);
@@ -140,7 +140,7 @@ void GetExecutablePath(string* path) {
     PERROR("readlink for /proc/self/exe");
   }
   mypath[l] = '\0';
-  *path = mypath;
+  return {mypath};
 #elif defined(__APPLE__)
   char mypath[PATH_MAX + 1];
   uint32_t size = PATH_MAX;
@@ -148,7 +148,7 @@ void GetExecutablePath(string* path) {
     ERROR("_NSGetExecutablePath failed");
   }
   mypath[size] = 0;
-  *path = mypath;
+  return {mypath};
 #else
 #error "Unsupported OS"
 #endif
@@ -159,50 +159,42 @@ namespace {
 class GlobCache {
  public:
   ~GlobCache() { Clear(); }
-
-  void Get(const char* pat, vector<string>** files) {
-    auto p = cache_.emplace(pat, nullptr);
-    if (p.second) {
-      vector<string>* files = p.first->second = new vector<string>;
+  const GlobMap::mapped_type& Get(const char* pat) {
+    auto [it, inserted] = cache_.try_emplace(pat);
+    auto& files = it->second;
+    if (inserted) {
       if (strcspn(pat, "?*[\\") != strlen(pat)) {
         glob_t gl;
         glob(pat, 0, NULL, &gl);
         for (size_t i = 0; i < gl.gl_pathc; i++) {
-          files->push_back(gl.gl_pathv[i]);
+          files.push_back(gl.gl_pathv[i]);
         }
         globfree(&gl);
       } else {
         if (Exists(pat))
-          files->push_back(pat);
+          files.push_back(pat);
       }
     }
-    *files = p.first->second;
+    return files;
   }
 
-  const unordered_map<string, vector<string>*>& GetAll() const {
-    return cache_;
-  }
+  const GlobMap& GetAll() const { return cache_; }
 
-  void Clear() {
-    for (auto& p : cache_) {
-      delete p.second;
-    }
-    cache_.clear();
-  }
+  void Clear() { cache_.clear(); }
 
  private:
-  unordered_map<string, vector<string>*> cache_;
+  GlobMap cache_;
 };
 
 static GlobCache g_gc;
 
 }  // namespace
 
-void Glob(const char* pat, vector<string>** files) {
-  g_gc.Get(pat, files);
+const GlobMap::mapped_type& Glob(const char* pat) {
+  return g_gc.Get(pat);
 }
 
-const unordered_map<string, vector<string>*>& GetAllGlobCache() {
+const GlobMap& GetAllGlobCache() {
   return g_gc.GetAll();
 }
 

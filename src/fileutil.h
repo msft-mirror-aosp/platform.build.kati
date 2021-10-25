@@ -42,11 +42,13 @@ int RunCommand(const string& shell,
                RedirectStderr redirect_stderr,
                string* out);
 
-void GetExecutablePath(string* path);
+std::string GetExecutablePath();
 
-void Glob(const char* pat, vector<string>** files);
+using GlobMap = std::unordered_map<std::string, std::vector<std::string>>;
 
-const unordered_map<string, vector<string>*>& GetAllGlobCache();
+const GlobMap::mapped_type& Glob(const char* pat);
+
+const GlobMap& GetAllGlobCache();
 
 void ClearGlobCache();
 
