@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -32,7 +33,6 @@
 #include "ninja.h"
 #include "stats.h"
 #include "strutil.h"
-#include "thread_pool.h"
 
 namespace {
 
@@ -162,9 +162,7 @@ class StampChecker {
       double ts = GetTimestamp(s);
       if (gen_time < ts) {
         if (g_flags.regen_ignoring_kati_binary) {
-          string kati_binary;
-          GetExecutablePath(&kati_binary);
-          if (s == kati_binary) {
+          if (s == GetExecutablePath()) {
             fprintf(stderr, "%s was modified, ignored.\n", s.c_str());
             continue;
           }
@@ -280,12 +278,11 @@ class StampChecker {
 
   bool CheckGlobResult(const GlobResult* gr, string* err) {
     COLLECT_STATS("glob time (regen)");
-    vector<string>* files;
-    Glob(gr->pat.c_str(), &files);
-    bool needs_regen = files->size() != gr->result.size();
+    const auto& files = Glob(gr->pat.c_str());
+    bool needs_regen = files.size() != gr->result.size();
     for (size_t i = 0; i < gr->result.size(); i++) {
       if (!needs_regen) {
-        if ((*files)[i] != gr->result[i]) {
+        if (files[i] != gr->result[i]) {
           needs_regen = true;
           break;
         }
@@ -430,9 +427,7 @@ class StampChecker {
   }
 
   bool CheckStep2() {
-    unique_ptr<ThreadPool> tp(NewThreadPool(g_flags.num_jobs));
-
-    tp->Submit([this]() {
+    auto glob_future = std::async([this]() {
       string err;
       // TODO: Make glob cache thread safe and create a task for each glob.
       SetAffinityForSingleThread();
@@ -448,7 +443,7 @@ class StampChecker {
       }
     });
 
-    tp->Submit([this]() {
+    auto shell_future = std::async([this]() {
       SetAffinityForSingleThread();
       for (ShellResult* sr : commands_) {
         string err;
@@ -462,7 +457,8 @@ class StampChecker {
       }
     });
 
-    tp->Wait();
+    glob_future.wait();
+    shell_future.wait();
     if (needs_regen_) {
       fprintf(stderr, "%s", msg_.c_str());
     }

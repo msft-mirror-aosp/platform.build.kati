@@ -73,9 +73,6 @@ ScopedFrame::ScopedFrame(Evaluator* ev, Frame* frame) : ev_(ev), frame_(frame) {
   ev_->stack_.push_back(frame);
 }
 
-ScopedFrame::ScopedFrame(ScopedFrame&& other)
-    : ev_(other.ev_), frame_(other.frame_) {}
-
 ScopedFrame::~ScopedFrame() {
   if (!ev_->trace_) {
     return;
@@ -612,15 +609,15 @@ void Evaluator::DoInclude(const string& fname) {
   CheckStack();
   COLLECT_STATS_WITH_SLOW_REPORT("included makefiles", fname.c_str());
 
-  Makefile* mk = MakefileCacheManager::Get()->ReadMakefile(fname);
-  if (!mk->Exists()) {
+  const Makefile& mk = MakefileCacheManager::Get().ReadMakefile(fname);
+  if (!mk.Exists()) {
     Error(StringPrintf("%s does not exist", fname.c_str()));
   }
 
   Var* var_list = LookupVar(Intern("MAKEFILE_LIST"));
   var_list->AppendVar(
       this, Value::NewLiteral(Intern(TrimLeadingCurdir(fname)).str()));
-  for (Stmt* stmt : mk->stmts()) {
+  for (Stmt* stmt : mk.stmts()) {
     LOG("%s", stmt->DebugString().c_str());
     stmt->Eval(this);
   }
@@ -638,11 +635,10 @@ void Evaluator::EvalInclude(const IncludeStmt* stmt) {
   const string&& pats = stmt->expr->Eval(this);
   for (StringPiece pat : WordScanner(pats)) {
     ScopedTerminator st(pat);
-    vector<string>* files;
-    Glob(pat.data(), &files);
+    const auto& files = Glob(pat.data());
 
     if (stmt->should_exist) {
-      if (files->empty()) {
+      if (files.empty()) {
         // TODO: Kati does not support building a missing include file.
         Error(StringPrintf("%s: %s", pat.data(), strerror(errno)));
       }
@@ -650,7 +646,7 @@ void Evaluator::EvalInclude(const IncludeStmt* stmt) {
 
     include_stack_.push_back(stmt->loc());
 
-    for (const string& fname : *files) {
+    for (const string& fname : files) {
       if (!stmt->should_exist && g_flags.ignore_optional_include_pattern &&
           Pattern(g_flags.ignore_optional_include_pattern).Match(fname)) {
         continue;
@@ -885,6 +881,14 @@ void Evaluator::DumpIncludeJSON(const string& filename) const {
 
   graph.DumpJSON(jsonfile);
   fclose(jsonfile);
+}
+
+bool Evaluator::IsEvaluatingCommand() const {
+  return is_evaluating_command_;
+}
+
+void Evaluator::SetEvaluatingCommand(bool evaluating_command) {
+  is_evaluating_command_ = evaluating_command;
 }
 
 SymbolSet Evaluator::used_undefined_vars_;
