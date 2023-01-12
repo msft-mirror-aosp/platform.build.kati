@@ -22,6 +22,7 @@
 #include <string>
 
 #include "fileutil.h"
+#include "log.h"
 #include "strutil.h"
 
 int FindUnitTests();
@@ -32,7 +33,7 @@ int main(int argc, char* argv[]) {
   }
 
   InitFindEmulator();
-  string cmd;
+  std::string cmd;
   for (int i = 1; i < argc; i++) {
     if (i > 1)
       cmd += ' ';
@@ -43,19 +44,19 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "Find emulator does not support this command\n");
     return 1;
   }
-  string out;
+  std::string out;
   if (!FindEmulator::Get()->HandleFind(cmd, fc, Loc(), &out)) {
     fprintf(stderr, "Find emulator does not support this command\n");
     return 1;
   }
 
-  for (StringPiece tok : WordScanner(out)) {
+  for (std::string_view tok : WordScanner(out)) {
     printf("%.*s\n", SPF(tok));
   }
 }
 
-string Run(const string& cmd) {
-  string s;
+std::string Run(const std::string& cmd) {
+  std::string s;
   int ret = RunCommand("/bin/sh", "-c", cmd, RedirectStderr::NONE, &s);
 
   if (ret != 0) {
@@ -68,22 +69,22 @@ string Run(const string& cmd) {
 
 static bool unit_test_failed = false;
 
-void CompareFind(const string& cmd) {
-  string native = Run(cmd);
+void CompareFind(const std::string& cmd) {
+  std::string native = Run(cmd);
 
   FindCommand fc;
   if (!fc.Parse(cmd)) {
     fprintf(stderr, "Find emulator cannot parse `%s`\n", cmd.c_str());
     exit(1);
   }
-  string emulated;
+  std::string emulated;
   if (!FindEmulator::Get()->HandleFind(cmd, fc, Loc(), &emulated)) {
     fprintf(stderr, "Find emulator cannot handle `%s`\n", cmd.c_str());
     exit(1);
   }
 
-  vector<StringPiece> nativeWords;
-  vector<StringPiece> emulatedWords;
+  std::vector<std::string_view> nativeWords;
+  std::vector<std::string_view> emulatedWords;
 
   WordScanner(native).Split(&nativeWords);
   WordScanner(emulated).Split(&emulatedWords);
@@ -99,17 +100,17 @@ void CompareFind(const string& cmd) {
       fprintf(stderr, " %-20s %-20s\n",
               (nativeIter == nativeWords.end())
                   ? ""
-                  : (*nativeIter++).as_string().c_str(),
+                  : std::string(*nativeIter++).c_str(),
               (emulatedIter == emulatedWords.end())
                   ? ""
-                  : (*emulatedIter++).as_string().c_str());
+                  : std::string(*emulatedIter++).c_str());
     }
     fprintf(stderr, "------------------------------------------\n");
     unit_test_failed = true;
   }
 }
 
-void ExpectParseFailure(const string& cmd) {
+void ExpectParseFailure(const std::string& cmd) {
   FindCommand fc;
   if (fc.Parse(cmd)) {
     fprintf(stderr, "Expected parse failure for `%s`\n", cmd.c_str());

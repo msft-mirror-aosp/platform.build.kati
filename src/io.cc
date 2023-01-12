@@ -23,7 +23,7 @@ void DumpInt(FILE* fp, int v) {
   CHECK(r == 1);
 }
 
-void DumpString(FILE* fp, StringPiece s) {
+void DumpString(FILE* fp, std::string_view s) {
   DumpInt(fp, s.size());
   size_t r = fwrite(s.data(), 1, s.size(), fp);
   CHECK(r == s.size());
@@ -37,7 +37,7 @@ int LoadInt(FILE* fp) {
   return v;
 }
 
-bool LoadString(FILE* fp, string* s) {
+bool LoadString(FILE* fp, std::string* s) {
   int len = LoadInt(fp);
   if (len < 0)
     return false;

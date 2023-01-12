@@ -45,11 +45,11 @@ namespace {
 
 // TODO: This code is very similar to
 // NinjaGenerator::TranslateCommand. Factor them out.
-void StripShellComment(string* cmd) {
-  if (cmd->find('#') == string::npos)
+void StripShellComment(std::string* cmd) {
+  if (cmd->find('#') == std::string::npos)
     return;
 
-  string res;
+  std::string res;
   bool prev_backslash = false;
   // Set space as an initial value so the leading comment will be
   // stripped out.
@@ -98,30 +98,32 @@ void StripShellComment(string* cmd) {
   cmd->swap(res);
 }
 
-void PatsubstFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& pat_str = args[0]->Eval(ev);
-  const string&& repl = args[1]->Eval(ev);
-  const string&& str = args[2]->Eval(ev);
+void PatsubstFunc(const std::vector<Value*>& args,
+                  Evaluator* ev,
+                  std::string* s) {
+  const std::string&& pat_str = args[0]->Eval(ev);
+  const std::string&& repl = args[1]->Eval(ev);
+  const std::string&& str = args[2]->Eval(ev);
   WordWriter ww(s);
   Pattern pat(pat_str);
-  for (StringPiece tok : WordScanner(str)) {
+  for (std::string_view tok : WordScanner(str)) {
     ww.MaybeAddWhitespace();
     pat.AppendSubst(tok, repl, s);
   }
 }
 
-void StripFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& str = args[0]->Eval(ev);
+void StripFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
+  const std::string&& str = args[0]->Eval(ev);
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(str)) {
+  for (std::string_view tok : WordScanner(str)) {
     ww.Write(tok);
   }
 }
 
-void SubstFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& pat = args[0]->Eval(ev);
-  const string&& repl = args[1]->Eval(ev);
-  const string&& str = args[2]->Eval(ev);
+void SubstFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
+  const std::string&& pat = args[0]->Eval(ev);
+  const std::string&& repl = args[1]->Eval(ev);
+  const std::string&& str = args[2]->Eval(ev);
   if (pat.empty()) {
     *s += str;
     *s += repl;
@@ -130,31 +132,35 @@ void SubstFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   size_t index = 0;
   while (index < str.size()) {
     size_t found = str.find(pat, index);
-    if (found == string::npos)
+    if (found == std::string::npos)
       break;
-    AppendString(StringPiece(str).substr(index, found - index), s);
+    AppendString(std::string_view(str).substr(index, found - index), s);
     AppendString(repl, s);
     index = found + pat.size();
   }
-  AppendString(StringPiece(str).substr(index), s);
+  AppendString(std::string_view(str).substr(index), s);
 }
 
-void FindstringFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& find = args[0]->Eval(ev);
-  const string&& in = args[1]->Eval(ev);
-  if (in.find(find) != string::npos)
+void FindstringFunc(const std::vector<Value*>& args,
+                    Evaluator* ev,
+                    std::string* s) {
+  const std::string&& find = args[0]->Eval(ev);
+  const std::string&& in = args[1]->Eval(ev);
+  if (in.find(find) != std::string::npos)
     AppendString(find, s);
 }
 
-void FilterFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& pat_buf = args[0]->Eval(ev);
-  const string&& text = args[1]->Eval(ev);
-  vector<Pattern> pats;
-  for (StringPiece pat : WordScanner(pat_buf)) {
+void FilterFunc(const std::vector<Value*>& args,
+                Evaluator* ev,
+                std::string* s) {
+  const std::string&& pat_buf = args[0]->Eval(ev);
+  const std::string&& text = args[1]->Eval(ev);
+  std::vector<Pattern> pats;
+  for (std::string_view pat : WordScanner(pat_buf)) {
     pats.push_back(Pattern(pat));
   }
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(text)) {
+  for (std::string_view tok : WordScanner(text)) {
     for (const Pattern& pat : pats) {
       if (pat.Match(tok)) {
         ww.Write(tok);
@@ -164,15 +170,17 @@ void FilterFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   }
 }
 
-void FilterOutFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& pat_buf = args[0]->Eval(ev);
-  const string&& text = args[1]->Eval(ev);
-  vector<Pattern> pats;
-  for (StringPiece pat : WordScanner(pat_buf)) {
+void FilterOutFunc(const std::vector<Value*>& args,
+                   Evaluator* ev,
+                   std::string* s) {
+  const std::string&& pat_buf = args[0]->Eval(ev);
+  const std::string&& text = args[1]->Eval(ev);
+  std::vector<Pattern> pats;
+  for (std::string_view pat : WordScanner(pat_buf)) {
     pats.push_back(Pattern(pat));
   }
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(text)) {
+  for (std::string_view tok : WordScanner(text)) {
     bool matched = false;
     for (const Pattern& pat : pats) {
       if (pat.Match(tok)) {
@@ -185,18 +193,18 @@ void FilterOutFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   }
 }
 
-void SortFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  string list;
+void SortFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
+  std::string list;
   args[0]->Eval(ev, &list);
   COLLECT_STATS("func sort time");
   // TODO(hamaji): Probably we could use a faster string-specific sort
   // algorithm.
-  vector<StringPiece> toks;
+  std::vector<std::string_view> toks;
   WordScanner(list).Split(&toks);
   stable_sort(toks.begin(), toks.end());
   WordWriter ww(s);
-  StringPiece prev;
-  for (StringPiece tok : toks) {
+  std::string_view prev;
+  for (std::string_view tok : toks) {
     if (prev != tok) {
       ww.Write(tok);
       prev = tok;
@@ -204,8 +212,8 @@ void SortFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   }
 }
 
-static int GetNumericValueForFunc(const string& buf) {
-  StringPiece s = TrimLeftSpace(buf);
+static int GetNumericValueForFunc(const std::string& buf) {
+  std::string_view s = TrimLeftSpace(buf);
   char* end;
   long n = strtol(s.data(), &end, 10);
   if (n < 0 || n == LONG_MAX || s.data() + s.size() != end) {
@@ -214,8 +222,8 @@ static int GetNumericValueForFunc(const string& buf) {
   return n;
 }
 
-void WordFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& n_str = args[0]->Eval(ev);
+void WordFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
+  const std::string&& n_str = args[0]->Eval(ev);
   int n = GetNumericValueForFunc(n_str);
   if (n < 0) {
     ev->Error(
@@ -226,8 +234,8 @@ void WordFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
     ev->Error("*** first argument to `word' function must be greater than 0.");
   }
 
-  const string&& text = args[1]->Eval(ev);
-  for (StringPiece tok : WordScanner(text)) {
+  const std::string&& text = args[1]->Eval(ev);
+  for (std::string_view tok : WordScanner(text)) {
     n--;
     if (n == 0) {
       AppendString(tok, s);
@@ -236,8 +244,10 @@ void WordFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   }
 }
 
-void WordlistFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& s_str = args[0]->Eval(ev);
+void WordlistFunc(const std::vector<Value*>& args,
+                  Evaluator* ev,
+                  std::string* s) {
+  const std::string&& s_str = args[0]->Eval(ev);
   int si = GetNumericValueForFunc(s_str);
   if (si < 0) {
     ev->Error(StringPrintf(
@@ -250,7 +260,7 @@ void WordlistFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
                      s_str.c_str()));
   }
 
-  const string&& e_str = args[1]->Eval(ev);
+  const std::string&& e_str = args[1]->Eval(ev);
   int ei = GetNumericValueForFunc(e_str);
   if (ei < 0) {
     ev->Error(StringPrintf(
@@ -258,10 +268,10 @@ void WordlistFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
         e_str.c_str()));
   }
 
-  const string&& text = args[2]->Eval(ev);
+  const std::string&& text = args[2]->Eval(ev);
   int i = 0;
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(text)) {
+  for (std::string_view tok : WordScanner(text)) {
     i++;
     if (si <= i && i <= ei) {
       ww.Write(tok);
@@ -269,8 +279,8 @@ void WordlistFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   }
 }
 
-void WordsFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& text = args[0]->Eval(ev);
+void WordsFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
+  const std::string&& text = args[0]->Eval(ev);
   WordScanner ws(text);
   int n = 0;
   for (auto iter = ws.begin(); iter != ws.end(); ++iter)
@@ -280,8 +290,10 @@ void WordsFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   *s += buf;
 }
 
-void FirstwordFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& text = args[0]->Eval(ev);
+void FirstwordFunc(const std::vector<Value*>& args,
+                   Evaluator* ev,
+                   std::string* s) {
+  const std::string&& text = args[0]->Eval(ev);
   WordScanner ws(text);
   auto begin = ws.begin();
   if (begin != ws.end()) {
@@ -289,18 +301,20 @@ void FirstwordFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   }
 }
 
-void LastwordFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& text = args[0]->Eval(ev);
-  StringPiece last;
-  for (StringPiece tok : WordScanner(text)) {
+void LastwordFunc(const std::vector<Value*>& args,
+                  Evaluator* ev,
+                  std::string* s) {
+  const std::string&& text = args[0]->Eval(ev);
+  std::string_view last;
+  for (std::string_view tok : WordScanner(text)) {
     last = tok;
   }
   AppendString(last, s);
 }
 
-void JoinFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& list1 = args[0]->Eval(ev);
-  const string&& list2 = args[1]->Eval(ev);
+void JoinFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
+  const std::string&& list1 = args[0]->Eval(ev);
+  const std::string&& list2 = args[1]->Eval(ev);
   WordScanner ws1(list1);
   WordScanner ws2(list2);
   WordWriter ww(s);
@@ -317,82 +331,96 @@ void JoinFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
     ww.Write(*iter2);
 }
 
-void WildcardFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& pat = args[0]->Eval(ev);
+void WildcardFunc(const std::vector<Value*>& args,
+                  Evaluator* ev,
+                  std::string* s) {
+  const std::string&& pat = args[0]->Eval(ev);
   COLLECT_STATS("func wildcard time");
   // Note GNU make does not delay the execution of $(wildcard) so we
   // do not need to check avoid_io here.
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(pat)) {
+  for (std::string_view tok : WordScanner(pat)) {
     ScopedTerminator st(tok);
     const auto& files = Glob(tok.data());
-    for (const string& file : files) {
+    for (const std::string& file : files) {
       ww.Write(file);
     }
   }
 }
 
-void DirFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& text = args[0]->Eval(ev);
+void DirFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
+  const std::string&& text = args[0]->Eval(ev);
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(text)) {
+  for (std::string_view tok : WordScanner(text)) {
     ww.Write(Dirname(tok));
     s->push_back('/');
   }
 }
 
-void NotdirFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& text = args[0]->Eval(ev);
+void NotdirFunc(const std::vector<Value*>& args,
+                Evaluator* ev,
+                std::string* s) {
+  const std::string&& text = args[0]->Eval(ev);
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(text)) {
+  for (std::string_view tok : WordScanner(text)) {
     if (tok == "/") {
-      ww.Write(StringPiece(""));
+      ww.Write(std::string_view(""));
     } else {
       ww.Write(Basename(tok));
     }
   }
 }
 
-void SuffixFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& text = args[0]->Eval(ev);
+void SuffixFunc(const std::vector<Value*>& args,
+                Evaluator* ev,
+                std::string* s) {
+  const std::string&& text = args[0]->Eval(ev);
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(text)) {
-    StringPiece suf = GetExt(tok);
+  for (std::string_view tok : WordScanner(text)) {
+    std::string_view suf = GetExt(tok);
     if (!suf.empty())
       ww.Write(suf);
   }
 }
 
-void BasenameFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& text = args[0]->Eval(ev);
+void BasenameFunc(const std::vector<Value*>& args,
+                  Evaluator* ev,
+                  std::string* s) {
+  const std::string&& text = args[0]->Eval(ev);
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(text)) {
+  for (std::string_view tok : WordScanner(text)) {
     ww.Write(StripExt(tok));
   }
 }
 
-void AddsuffixFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& suf = args[0]->Eval(ev);
-  const string&& text = args[1]->Eval(ev);
+void AddsuffixFunc(const std::vector<Value*>& args,
+                   Evaluator* ev,
+                   std::string* s) {
+  const std::string&& suf = args[0]->Eval(ev);
+  const std::string&& text = args[1]->Eval(ev);
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(text)) {
+  for (std::string_view tok : WordScanner(text)) {
     ww.Write(tok);
     *s += suf;
   }
 }
 
-void AddprefixFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& pre = args[0]->Eval(ev);
-  const string&& text = args[1]->Eval(ev);
+void AddprefixFunc(const std::vector<Value*>& args,
+                   Evaluator* ev,
+                   std::string* s) {
+  const std::string&& pre = args[0]->Eval(ev);
+  const std::string&& text = args[1]->Eval(ev);
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(text)) {
+  for (std::string_view tok : WordScanner(text)) {
     ww.Write(pre);
     AppendString(tok, s);
   }
 }
 
-void RealpathFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& text = args[0]->Eval(ev);
+void RealpathFunc(const std::vector<Value*>& args,
+                  Evaluator* ev,
+                  std::string* s) {
+  const std::string&& text = args[0]->Eval(ev);
   if (ev->avoid_io()) {
     *s += "$(";
     *s += GetExecutablePath();
@@ -403,7 +431,7 @@ void RealpathFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   }
 
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(text)) {
+  for (std::string_view tok : WordScanner(text)) {
     ScopedTerminator st(tok);
     char buf[PATH_MAX];
     if (realpath(tok.data(), buf))
@@ -411,18 +439,20 @@ void RealpathFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   }
 }
 
-void AbspathFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& text = args[0]->Eval(ev);
+void AbspathFunc(const std::vector<Value*>& args,
+                 Evaluator* ev,
+                 std::string* s) {
+  const std::string&& text = args[0]->Eval(ev);
   WordWriter ww(s);
-  string buf;
-  for (StringPiece tok : WordScanner(text)) {
+  std::string buf;
+  for (std::string_view tok : WordScanner(text)) {
     AbsPath(tok, &buf);
     ww.Write(buf);
   }
 }
 
-void IfFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& cond = args[0]->Eval(ev);
+void IfFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
+  const std::string&& cond = args[0]->Eval(ev);
   if (cond.empty()) {
     if (args.size() > 2)
       args[2]->Eval(ev, s);
@@ -431,8 +461,8 @@ void IfFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   }
 }
 
-void AndFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  string cond;
+void AndFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
+  std::string cond;
   for (Value* a : args) {
     cond = a->Eval(ev);
     if (cond.empty())
@@ -443,9 +473,9 @@ void AndFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   }
 }
 
-void OrFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
+void OrFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
   for (Value* a : args) {
-    const string&& cond = a->Eval(ev);
+    const std::string&& cond = a->Eval(ev);
     if (!cond.empty()) {
       *s += cond;
       return;
@@ -453,24 +483,24 @@ void OrFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   }
 }
 
-void ValueFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& var_name = args[0]->Eval(ev);
+void ValueFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
+  const std::string&& var_name = args[0]->Eval(ev);
   Var* var = ev->LookupVar(Intern(var_name));
-  AppendString(var->String().as_string(), s);
+  AppendString(std::string(var->String()), s);
 }
 
-void EvalFunc(const vector<Value*>& args, Evaluator* ev, string*) {
+void EvalFunc(const std::vector<Value*>& args, Evaluator* ev, std::string*) {
   // TODO: eval leaks everything... for now.
   // const string text = args[0]->Eval(ev);
   ev->CheckStack();
-  string* text = new string;
+  std::string* text = new std::string;
   args[0]->Eval(ev, text);
   if (ev->avoid_io()) {
     KATI_WARN_LOC(ev->loc(),
                   "*warning*: $(eval) in a recipe is not recommended: %s",
                   text->c_str());
   }
-  vector<Stmt*> stmts;
+  std::vector<Stmt*> stmts;
   Parse(*text, ev->loc(), &stmts);
   for (Stmt* stmt : stmts) {
     LOG("%s", stmt->DebugString().c_str());
@@ -486,7 +516,7 @@ void EvalFunc(const vector<Value*>& args, Evaluator* ev, string*) {
 // will be passed to other make functions.
 // TODO: Maybe we should introduce a helper binary which evaluate
 // make expressions at ninja-time.
-static bool HasNoIoInShellScript(const string& cmd) {
+static bool HasNoIoInShellScript(const std::string& cmd) {
   if (cmd.empty())
     return true;
   if (HasPrefix(cmd, "echo $((") && cmd[cmd.size() - 1] == ')')
@@ -494,11 +524,11 @@ static bool HasNoIoInShellScript(const string& cmd) {
   return false;
 }
 
-static int ShellFuncImpl(const string& shell,
-                         const string& shellflag,
-                         const string& cmd,
+static int ShellFuncImpl(const std::string& shell,
+                         const std::string& shellflag,
+                         const std::string& cmd,
                          const Loc& loc,
-                         string* s,
+                         std::string* s,
                          FindCommand** fc) {
   LOG("ShellFunc: %s", cmd.c_str());
 
@@ -542,17 +572,18 @@ static int ShellFuncImpl(const string& shell,
   return 1;
 }
 
-static vector<CommandResult*> g_command_results;
+static std::vector<CommandResult*> g_command_results;
 
-bool ShouldStoreCommandResult(StringPiece cmd) {
+bool ShouldStoreCommandResult(std::string_view cmd) {
   // We really just want to ignore this one, or remove BUILD_DATETIME from
   // Android completely
   if (cmd == "date +%s")
     return false;
 
-  Pattern pat(g_flags.ignore_dirty_pattern);
-  Pattern nopat(g_flags.no_ignore_dirty_pattern);
-  for (StringPiece tok : WordScanner(cmd)) {
+  Pattern pat(g_flags.ignore_dirty_pattern ? g_flags.ignore_dirty_pattern : "");
+  Pattern nopat(
+      g_flags.no_ignore_dirty_pattern ? g_flags.no_ignore_dirty_pattern : "");
+  for (std::string_view tok : WordScanner(cmd)) {
     if (pat.Match(tok) && !nopat.Match(tok)) {
       return false;
     }
@@ -561,8 +592,8 @@ bool ShouldStoreCommandResult(StringPiece cmd) {
   return true;
 }
 
-void ShellFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  string cmd = args[0]->Eval(ev);
+void ShellFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
+  std::string cmd = args[0]->Eval(ev);
   if (ev->avoid_io() && !HasNoIoInShellScript(cmd)) {
     if (ev->eval_depth() > 1) {
       ERROR_LOC(ev->loc(),
@@ -577,10 +608,10 @@ void ShellFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
     return;
   }
 
-  const string&& shell = ev->GetShell();
-  const string&& shellflag = ev->GetShellFlag();
+  const std::string&& shell = ev->GetShell();
+  const std::string&& shellflag = ev->GetShellFlag();
 
-  string out;
+  std::string out;
   FindCommand* fc = NULL;
   int returnCode = ShellFuncImpl(shell, shellflag, cmd, ev->loc(), &out, &fc);
   if (ShouldStoreCommandResult(cmd)) {
@@ -598,13 +629,13 @@ void ShellFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   ShellStatusVar::SetValue(returnCode);
 }
 
-void CallFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
+void CallFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
   static const Symbol tmpvar_names[] = {
       Intern("0"), Intern("1"), Intern("2"), Intern("3"), Intern("4"),
       Intern("5"), Intern("6"), Intern("7"), Intern("8"), Intern("9")};
 
   ev->CheckStack();
-  const string&& func_name_buf = args[0]->Eval(ev);
+  const std::string&& func_name_buf = args[0]->Eval(ev);
   Symbol func_sym = Intern(TrimSpace(func_name_buf));
   Var* func = ev->LookupVar(func_sym);
   func->Used(ev, func_sym);
@@ -612,15 +643,14 @@ void CallFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
     KATI_WARN_LOC(ev->loc(), "*warning*: undefined user function: %s",
                   func_sym.c_str());
   }
-  vector<unique_ptr<SimpleVar>> av;
+  std::vector<std::unique_ptr<SimpleVar>> av;
   for (size_t i = 1; i < args.size(); i++) {
-    unique_ptr<SimpleVar> s(
-        new SimpleVar(args[i]->Eval(ev), VarOrigin::AUTOMATIC, nullptr, Loc()));
-    av.push_back(move(s));
+    av.emplace_back(std::make_unique<SimpleVar>(
+        args[i]->Eval(ev), VarOrigin::AUTOMATIC, nullptr, Loc()));
   }
-  vector<unique_ptr<ScopedGlobalVar>> sv;
+  std::vector<std::unique_ptr<ScopedGlobalVar>> sv;
   for (size_t i = 1;; i++) {
-    string s;
+    std::string s;
     Symbol tmpvar_name_sym;
     if (i < sizeof(tmpvar_names) / sizeof(tmpvar_names[0])) {
       tmpvar_name_sym = tmpvar_names[i];
@@ -653,14 +683,16 @@ void CallFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   ev->IncrementEvalDepth();
 }
 
-void ForeachFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& varname = args[0]->Eval(ev);
-  const string&& list = args[1]->Eval(ev);
+void ForeachFunc(const std::vector<Value*>& args,
+                 Evaluator* ev,
+                 std::string* s) {
+  const std::string&& varname = args[0]->Eval(ev);
+  const std::string&& list = args[1]->Eval(ev);
   ev->DecrementEvalDepth();
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(list)) {
-    unique_ptr<SimpleVar> v(
-        new SimpleVar(tok.as_string(), VarOrigin::AUTOMATIC, nullptr, Loc()));
+  for (std::string_view tok : WordScanner(list)) {
+    std::unique_ptr<SimpleVar> v(
+        new SimpleVar(std::string(tok), VarOrigin::AUTOMATIC, nullptr, Loc()));
     ScopedGlobalVar sv(Intern(varname), v.get());
     ww.MaybeAddWhitespace();
     args[2]->Eval(ev, s);
@@ -668,20 +700,24 @@ void ForeachFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
   ev->IncrementEvalDepth();
 }
 
-void OriginFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& var_name = args[0]->Eval(ev);
+void OriginFunc(const std::vector<Value*>& args,
+                Evaluator* ev,
+                std::string* s) {
+  const std::string&& var_name = args[0]->Eval(ev);
   Var* var = ev->LookupVar(Intern(var_name));
   *s += GetOriginStr(var->Origin());
 }
 
-void FlavorFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
-  const string&& var_name = args[0]->Eval(ev);
+void FlavorFunc(const std::vector<Value*>& args,
+                Evaluator* ev,
+                std::string* s) {
+  const std::string&& var_name = args[0]->Eval(ev);
   Var* var = ev->LookupVar(Intern(var_name));
   *s += var->Flavor();
 }
 
-void InfoFunc(const vector<Value*>& args, Evaluator* ev, string*) {
-  const string&& a = args[0]->Eval(ev);
+void InfoFunc(const std::vector<Value*>& args, Evaluator* ev, std::string*) {
+  const std::string&& a = args[0]->Eval(ev);
   if (ev->avoid_io()) {
     ev->add_delayed_output_command(
         StringPrintf("echo -e \"%s\"", EchoEscape(a).c_str()));
@@ -691,8 +727,8 @@ void InfoFunc(const vector<Value*>& args, Evaluator* ev, string*) {
   fflush(stdout);
 }
 
-void WarningFunc(const vector<Value*>& args, Evaluator* ev, string*) {
-  const string&& a = args[0]->Eval(ev);
+void WarningFunc(const std::vector<Value*>& args, Evaluator* ev, std::string*) {
+  const std::string&& a = args[0]->Eval(ev);
   if (ev->avoid_io()) {
     ev->add_delayed_output_command(StringPrintf(
         "echo -e \"%s:%d: %s\" 2>&1", LOCF(ev->loc()), EchoEscape(a).c_str()));
@@ -701,8 +737,8 @@ void WarningFunc(const vector<Value*>& args, Evaluator* ev, string*) {
   WARN_LOC(ev->loc(), "%s", a.c_str());
 }
 
-void ErrorFunc(const vector<Value*>& args, Evaluator* ev, string*) {
-  const string&& a = args[0]->Eval(ev);
+void ErrorFunc(const std::vector<Value*>& args, Evaluator* ev, std::string*) {
+  const std::string&& a = args[0]->Eval(ev);
   if (ev->avoid_io()) {
     ev->add_delayed_output_command(
         StringPrintf("echo -e \"%s:%d: *** %s.\" 2>&1 && false",
@@ -712,7 +748,9 @@ void ErrorFunc(const vector<Value*>& args, Evaluator* ev, string*) {
   ev->Error(StringPrintf("*** %s.", a.c_str()));
 }
 
-static void FileReadFunc(Evaluator* ev, const string& filename, string* s) {
+static void FileReadFunc(Evaluator* ev,
+                         const std::string& filename,
+                         std::string* s) {
   int fd = open(filename.c_str(), O_RDONLY);
   if (fd < 0) {
     if (errno == ENOENT) {
@@ -735,7 +773,7 @@ static void FileReadFunc(Evaluator* ev, const string& filename, string* s) {
   }
 
   size_t len = st.st_size;
-  string out;
+  std::string out;
   out.resize(len);
   ssize_t r = HANDLE_EINTR(read(fd, &out[0], len));
   if (r != static_cast<ssize_t>(len)) {
@@ -761,9 +799,9 @@ static void FileReadFunc(Evaluator* ev, const string& filename, string* s) {
 }
 
 static void FileWriteFunc(Evaluator* ev,
-                          const string& filename,
+                          const std::string& filename,
                           bool append,
-                          string text) {
+                          std::string text) {
   FILE* f = fopen(filename.c_str(), append ? "ab" : "wb");
   if (f == NULL) {
     ev->Error("*** fopen failed.");
@@ -787,13 +825,13 @@ static void FileWriteFunc(Evaluator* ev,
   }
 }
 
-void FileFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
+void FileFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
   if (ev->avoid_io()) {
     ev->Error("*** $(file ...) is not supported in rules.");
   }
 
-  string arg = args[0]->Eval(ev);
-  StringPiece filename = TrimSpace(arg);
+  std::string arg = args[0]->Eval(ev);
+  std::string_view filename = TrimSpace(arg);
 
   if (filename.size() <= 1) {
     ev->Error("*** Missing filename");
@@ -808,7 +846,7 @@ void FileFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
       ev->Error("*** invalid argument");
     }
 
-    FileReadFunc(ev, filename.as_string(), s);
+    FileReadFunc(ev, std::string(filename), s);
   } else if (filename[0] == '>') {
     bool append = false;
     if (filename[1] == '>') {
@@ -822,7 +860,7 @@ void FileFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
       ev->Error("*** Missing filename");
     }
 
-    string text;
+    std::string text;
     if (args.size() > 1) {
       text = args[1]->Eval(ev);
       if (text.size() == 0 || text.back() != '\n') {
@@ -830,16 +868,18 @@ void FileFunc(const vector<Value*>& args, Evaluator* ev, string* s) {
       }
     }
 
-    FileWriteFunc(ev, filename.as_string(), append, text);
+    FileWriteFunc(ev, std::string(filename), append, text);
   } else {
     ev->Error(StringPrintf("*** Invalid file operation: %s.  Stop.",
-                           filename.as_string().c_str()));
+                           std::string(filename).c_str()));
   }
 }
 
-void DeprecatedVarFunc(const vector<Value*>& args, Evaluator* ev, string*) {
-  string vars_str = args[0]->Eval(ev);
-  string msg;
+void DeprecatedVarFunc(const std::vector<Value*>& args,
+                       Evaluator* ev,
+                       std::string*) {
+  std::string vars_str = args[0]->Eval(ev);
+  std::string msg;
 
   if (args.size() == 2) {
     msg = ". " + args[1]->Eval(ev);
@@ -849,7 +889,7 @@ void DeprecatedVarFunc(const vector<Value*>& args, Evaluator* ev, string*) {
     ev->Error("*** $(KATI_deprecated_var ...) is not supported in rules.");
   }
 
-  for (StringPiece var : WordScanner(vars_str)) {
+  for (std::string_view var : WordScanner(vars_str)) {
     Symbol sym = Intern(var);
     Var* v = ev->PeekVar(sym);
     if (!v->IsDefined()) {
@@ -873,9 +913,11 @@ void DeprecatedVarFunc(const vector<Value*>& args, Evaluator* ev, string*) {
   }
 }
 
-void ObsoleteVarFunc(const vector<Value*>& args, Evaluator* ev, string*) {
-  string vars_str = args[0]->Eval(ev);
-  string msg;
+void ObsoleteVarFunc(const std::vector<Value*>& args,
+                     Evaluator* ev,
+                     std::string*) {
+  std::string vars_str = args[0]->Eval(ev);
+  std::string msg;
 
   if (args.size() == 2) {
     msg = ". " + args[1]->Eval(ev);
@@ -885,7 +927,7 @@ void ObsoleteVarFunc(const vector<Value*>& args, Evaluator* ev, string*) {
     ev->Error("*** $(KATI_obsolete_var ...) is not supported in rules.");
   }
 
-  for (StringPiece var : WordScanner(vars_str)) {
+  for (std::string_view var : WordScanner(vars_str)) {
     Symbol sym = Intern(var);
     Var* v = ev->PeekVar(sym);
     if (!v->IsDefined()) {
@@ -908,8 +950,10 @@ void ObsoleteVarFunc(const vector<Value*>& args, Evaluator* ev, string*) {
   }
 }
 
-void DeprecateExportFunc(const vector<Value*>& args, Evaluator* ev, string*) {
-  string msg = ". " + args[0]->Eval(ev);
+void DeprecateExportFunc(const std::vector<Value*>& args,
+                         Evaluator* ev,
+                         std::string*) {
+  std::string msg = ". " + args[0]->Eval(ev);
 
   if (ev->avoid_io()) {
     ev->Error("*** $(KATI_deprecate_export) is not supported in rules.");
@@ -924,8 +968,10 @@ void DeprecateExportFunc(const vector<Value*>& args, Evaluator* ev, string*) {
   ev->SetExportDeprecated(msg);
 }
 
-void ObsoleteExportFunc(const vector<Value*>& args, Evaluator* ev, string*) {
-  string msg = ". " + args[0]->Eval(ev);
+void ObsoleteExportFunc(const std::vector<Value*>& args,
+                        Evaluator* ev,
+                        std::string*) {
+  std::string msg = ". " + args[0]->Eval(ev);
 
   if (ev->avoid_io()) {
     ev->Error("*** $(KATI_obsolete_export) is not supported in rules.");
@@ -938,21 +984,21 @@ void ObsoleteExportFunc(const vector<Value*>& args, Evaluator* ev, string*) {
   ev->SetExportObsolete(msg);
 }
 
-void ProfileFunc(const vector<Value*>& args, Evaluator* ev, string*) {
+void ProfileFunc(const std::vector<Value*>& args, Evaluator* ev, std::string*) {
   for (auto arg : args) {
-    string files = arg->Eval(ev);
-    for (StringPiece file : WordScanner(files)) {
+    std::string files = arg->Eval(ev);
+    for (std::string_view file : WordScanner(files)) {
       ev->ProfileMakefile(file);
     }
   }
 }
 
-void VariableLocationFunc(const vector<Value*>& args,
+void VariableLocationFunc(const std::vector<Value*>& args,
                           Evaluator* ev,
-                          string* s) {
-  string arg = args[0]->Eval(ev);
+                          std::string* s) {
+  std::string arg = args[0]->Eval(ev);
   WordWriter ww(s);
-  for (StringPiece var : WordScanner(arg)) {
+  for (std::string_view var : WordScanner(arg)) {
     Symbol sym = Intern(var);
     Var* v = ev->PeekVar(sym);
     const Loc& loc = v->Location();
@@ -967,7 +1013,7 @@ void VariableLocationFunc(const vector<Value*>& args,
     name, { name, args }     \
   }
 
-static const std::unordered_map<StringPiece, FuncInfo> g_func_info_map = {
+static const std::unordered_map<std::string_view, FuncInfo> g_func_info_map = {
 
     ENTRY("patsubst", &PatsubstFunc, 3, 3, false, false),
     ENTRY("strip", &StripFunc, 1, 1, false, false),
@@ -1024,13 +1070,13 @@ static const std::unordered_map<StringPiece, FuncInfo> g_func_info_map = {
 
 }  // namespace
 
-const FuncInfo* GetFuncInfo(StringPiece name) {
+const FuncInfo* GetFuncInfo(std::string_view name) {
   auto found = g_func_info_map.find(name);
   if (found == g_func_info_map.end())
     return nullptr;
   return &found->second;
 }
 
-const vector<CommandResult*>& GetShellCommandResults() {
+const std::vector<CommandResult*>& GetShellCommandResults() {
   return g_command_results;
 }

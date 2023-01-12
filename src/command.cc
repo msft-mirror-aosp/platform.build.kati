@@ -21,6 +21,7 @@
 
 #include "dep.h"
 #include "eval.h"
+#include "fileutil.h"
 #include "flags.h"
 #include "log.h"
 #include "strutil.h"
@@ -35,13 +36,13 @@ class AutoVar : public Var {
 
   virtual void AppendVar(Evaluator*, Value*) override { CHECK(false); }
 
-  virtual StringPiece String() const override {
+  virtual std::string_view String() const override {
     ERROR("$(value %s) is not implemented yet", sym_);
     return "";
   }
 
-  virtual string DebugString() const override {
-    return string("AutoVar(") + sym_ + ")";
+  virtual std::string DebugString() const override {
+    return std::string("AutoVar(") + sym_ + ")";
   }
 
   virtual bool IsFunc(Evaluator*) const override { return true; }
@@ -59,7 +60,7 @@ class AutoVar : public Var {
    public:                                                            \
     name(CommandEvaluator* ce, const char* sym) : AutoVar(ce, sym) {} \
     virtual ~name() = default;                                        \
-    virtual void Eval(Evaluator* ev, string* s) const override;       \
+    virtual void Eval(Evaluator* ev, std::string* s) const override;  \
   }
 
 DECLARE_AUTO_VAR_CLASS(AutoAtVar);
@@ -67,6 +68,7 @@ DECLARE_AUTO_VAR_CLASS(AutoLessVar);
 DECLARE_AUTO_VAR_CLASS(AutoHatVar);
 DECLARE_AUTO_VAR_CLASS(AutoPlusVar);
 DECLARE_AUTO_VAR_CLASS(AutoStarVar);
+DECLARE_AUTO_VAR_CLASS(AutoQuestionVar);
 DECLARE_AUTO_VAR_CLASS(AutoNotImplementedVar);
 
 class AutoSuffixDVar : public AutoVar {
@@ -74,7 +76,7 @@ class AutoSuffixDVar : public AutoVar {
   AutoSuffixDVar(CommandEvaluator* ce, const char* sym, Var* wrapped)
       : AutoVar(ce, sym), wrapped_(wrapped) {}
   virtual ~AutoSuffixDVar() = default;
-  virtual void Eval(Evaluator* ev, string* s) const override;
+  virtual void Eval(Evaluator* ev, std::string* s) const override;
 
  private:
   Var* wrapped_;
@@ -85,24 +87,24 @@ class AutoSuffixFVar : public AutoVar {
   AutoSuffixFVar(CommandEvaluator* ce, const char* sym, Var* wrapped)
       : AutoVar(ce, sym), wrapped_(wrapped) {}
   virtual ~AutoSuffixFVar() = default;
-  virtual void Eval(Evaluator* ev, string* s) const override;
+  virtual void Eval(Evaluator* ev, std::string* s) const override;
 
  private:
   Var* wrapped_;
 };
 
-void AutoAtVar::Eval(Evaluator*, string* s) const {
+void AutoAtVar::Eval(Evaluator*, std::string* s) const {
   *s += ce_->current_dep_node()->output.str();
 }
 
-void AutoLessVar::Eval(Evaluator*, string* s) const {
+void AutoLessVar::Eval(Evaluator*, std::string* s) const {
   auto& ai = ce_->current_dep_node()->actual_inputs;
   if (!ai.empty())
     *s += ai[0].str();
 }
 
-void AutoHatVar::Eval(Evaluator*, string* s) const {
-  unordered_set<StringPiece> seen;
+void AutoHatVar::Eval(Evaluator*, std::string* s) const {
+  std::unordered_set<std::string_view> seen;
   WordWriter ww(s);
   for (Symbol ai : ce_->current_dep_node()->actual_inputs) {
     if (seen.insert(ai.str()).second)
@@ -110,47 +112,83 @@ void AutoHatVar::Eval(Evaluator*, string* s) const {
   }
 }
 
-void AutoPlusVar::Eval(Evaluator*, string* s) const {
+void AutoPlusVar::Eval(Evaluator*, std::string* s) const {
   WordWriter ww(s);
   for (Symbol ai : ce_->current_dep_node()->actual_inputs) {
     ww.Write(ai.str());
   }
 }
 
-void AutoStarVar::Eval(Evaluator*, string* s) const {
+void AutoStarVar::Eval(Evaluator*, std::string* s) const {
   const DepNode* n = ce_->current_dep_node();
   if (!n->output_pattern.IsValid())
     return;
   Pattern pat(n->output_pattern.str());
-  pat.Stem(n->output.str()).AppendToString(s);
+  s->append(pat.Stem(n->output.str()));
 }
 
-void AutoNotImplementedVar::Eval(Evaluator* ev, string*) const {
+void AutoQuestionVar::Eval(Evaluator* ev, std::string* s) const {
+  std::unordered_set<std::string_view> seen;
+
+  if (ev->avoid_io()) {
+    // Check timestamps using the shell at the start of rule execution
+    // instead.
+    *s += "${KATI_NEW_INPUTS}";
+    if (!ce_->found_new_inputs()) {
+      std::string def;
+
+      WordWriter ww(&def);
+      ww.Write("KATI_NEW_INPUTS=$(find");
+      for (Symbol ai : ce_->current_dep_node()->actual_inputs) {
+        if (seen.insert(ai.str()).second) {
+          ww.Write(ai.str());
+        }
+      }
+      ww.Write("$(test -e");
+      ww.Write(ce_->current_dep_node()->output.str());
+      ww.Write("&& echo -newer");
+      ww.Write(ce_->current_dep_node()->output.str());
+      ww.Write(")) && export KATI_NEW_INPUTS");
+      ev->add_delayed_output_command(def);
+      ce_->set_found_new_inputs(true);
+    }
+  } else {
+    WordWriter ww(s);
+    double target_age = GetTimestamp(ce_->current_dep_node()->output.str());
+    for (Symbol ai : ce_->current_dep_node()->actual_inputs) {
+      if (seen.insert(ai.str()).second && GetTimestamp(ai.str()) > target_age) {
+        ww.Write(ai.str());
+      }
+    }
+  }
+}
+
+void AutoNotImplementedVar::Eval(Evaluator* ev, std::string*) const {
   ev->Error(StringPrintf("Automatic variable `$%s' isn't supported yet", sym_));
 }
 
-void AutoSuffixDVar::Eval(Evaluator* ev, string* s) const {
-  string buf;
+void AutoSuffixDVar::Eval(Evaluator* ev, std::string* s) const {
+  std::string buf;
   wrapped_->Eval(ev, &buf);
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(buf)) {
+  for (std::string_view tok : WordScanner(buf)) {
     ww.Write(Dirname(tok));
   }
 }
 
-void AutoSuffixFVar::Eval(Evaluator* ev, string* s) const {
-  string buf;
+void AutoSuffixFVar::Eval(Evaluator* ev, std::string* s) const {
+  std::string buf;
   wrapped_->Eval(ev, &buf);
   WordWriter ww(s);
-  for (StringPiece tok : WordScanner(buf)) {
+  for (std::string_view tok : WordScanner(buf)) {
     ww.Write(Basename(tok));
   }
 }
 
-void ParseCommandPrefixes(StringPiece* s, bool* echo, bool* ignore_error) {
+void ParseCommandPrefixes(std::string_view* s, bool* echo, bool* ignore_error) {
   *s = TrimLeftSpace(*s);
   while (true) {
-    char c = s->get(0);
+    char c = s->empty() ? 0 : s->front();
     if (c == '@') {
       *echo = false;
     } else if (c == '-') {
@@ -179,9 +217,9 @@ CommandEvaluator::CommandEvaluator(Evaluator* ev) : ev_(ev) {
   INSERT_AUTO_VAR(AutoHatVar, "^");
   INSERT_AUTO_VAR(AutoPlusVar, "+");
   INSERT_AUTO_VAR(AutoStarVar, "*");
+  INSERT_AUTO_VAR(AutoQuestionVar, "?");
   // TODO: Implement them.
   INSERT_AUTO_VAR(AutoNotImplementedVar, "%");
-  INSERT_AUTO_VAR(AutoNotImplementedVar, "?");
   INSERT_AUTO_VAR(AutoNotImplementedVar, "|");
 }
 
@@ -191,10 +229,11 @@ std::vector<Command> CommandEvaluator::Eval(const DepNode& n) {
   ev_->set_current_scope(n.rule_vars);
   ev_->SetEvaluatingCommand(true);
   current_dep_node_ = &n;
+  found_new_inputs_ = false;
   for (Value* v : n.cmds) {
     ev_->set_loc(v->Location());
-    const string&& cmds_buf = v->Eval(ev_);
-    StringPiece cmds = cmds_buf;
+    const std::string&& cmds_buf = v->Eval(ev_);
+    std::string_view cmds = cmds_buf;
     bool global_echo = !g_flags.is_silent_mode;
     bool global_ignore_error = false;
     ParseCommandPrefixes(&cmds, &global_echo, &global_ignore_error);
@@ -204,8 +243,8 @@ std::vector<Command> CommandEvaluator::Eval(const DepNode& n) {
       size_t lf_cnt;
       size_t index = FindEndOfLine(cmds, 0, &lf_cnt);
       if (index == cmds.size())
-        index = string::npos;
-      StringPiece cmd = TrimLeftSpace(cmds.substr(0, index));
+        index = std::string::npos;
+      std::string_view cmd = TrimLeftSpace(cmds.substr(0, index));
       cmds = cmds.substr(index + 1);
 
       bool echo = global_echo;
@@ -214,11 +253,11 @@ std::vector<Command> CommandEvaluator::Eval(const DepNode& n) {
 
       if (!cmd.empty()) {
         Command& command = result.emplace_back(n.output);
-        command.cmd = cmd.as_string();
+        command.cmd = std::string(cmd);
         command.echo = echo;
         command.ignore_error = ignore_error;
       }
-      if (index == string::npos)
+      if (index == std::string::npos)
         break;
     }
     continue;
@@ -226,11 +265,12 @@ std::vector<Command> CommandEvaluator::Eval(const DepNode& n) {
 
   if (!ev_->delayed_output_commands().empty()) {
     std::vector<Command> output_commands;
-    for (const string& cmd : ev_->delayed_output_commands()) {
+    for (const std::string& cmd : ev_->delayed_output_commands()) {
       Command& c = output_commands.emplace_back(n.output);
       c.cmd = cmd;
       c.echo = false;
       c.ignore_error = false;
+      c.force_no_subshell = true;
     }
     // Prepend |output_commands|.
     result.swap(output_commands);

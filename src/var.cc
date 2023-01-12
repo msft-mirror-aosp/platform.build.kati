@@ -21,7 +21,7 @@
 #include "log.h"
 #include "strutil.h"
 
-unordered_map<const Var*, string> Var::diagnostic_messages_;
+std::unordered_map<const Var*, std::string> Var::diagnostic_messages_;
 
 const char* GetOriginStr(VarOrigin origin) {
   switch (origin) {
@@ -65,14 +65,14 @@ void Var::AppendVar(Evaluator*, Value*) {
   CHECK(false);
 }
 
-void Var::SetDeprecated(const StringPiece& msg) {
+void Var::SetDeprecated(const std::string_view& msg) {
   deprecated_ = true;
-  diagnostic_messages_[this] = msg.as_string();
+  diagnostic_messages_[this] = std::string(msg);
 }
 
-void Var::SetObsolete(const StringPiece& msg) {
+void Var::SetObsolete(const std::string_view& msg) {
   obsolete_ = true;
-  diagnostic_messages_[this] = msg.as_string();
+  diagnostic_messages_[this] = std::string(msg);
 }
 
 void Var::Used(Evaluator* ev, const Symbol& sym) const {
@@ -90,8 +90,8 @@ const char* Var::diagnostic_message_text() const {
   return it == diagnostic_messages_.end() ? "" : it->second.c_str();
 }
 
-const string& Var::DeprecatedMessage() const {
-  static const string empty_string;
+const std::string& Var::DeprecatedMessage() const {
+  static const std::string empty_string;
   auto it = diagnostic_messages_.find(this);
   return it == diagnostic_messages_.end() ? empty_string : it->second;
 }
@@ -107,7 +107,7 @@ Var* Var::Undefined() {
 SimpleVar::SimpleVar(VarOrigin origin, Frame* definition, Loc loc)
     : Var(origin, definition, loc) {}
 
-SimpleVar::SimpleVar(const string& v,
+SimpleVar::SimpleVar(const std::string& v,
                      VarOrigin origin,
                      Frame* definition,
                      Loc loc)
@@ -126,24 +126,24 @@ bool SimpleVar::IsFunc(Evaluator*) const {
   return false;
 }
 
-void SimpleVar::Eval(Evaluator* ev, string* s) const {
+void SimpleVar::Eval(Evaluator* ev, std::string* s) const {
   ev->CheckStack();
   *s += v_;
 }
 
 void SimpleVar::AppendVar(Evaluator* ev, Value* v) {
-  string buf;
+  std::string buf;
   v->Eval(ev, &buf);
   v_.push_back(' ');
   v_ += buf;
   definition_ = ev->CurrentFrame();
 }
 
-StringPiece SimpleVar::String() const {
+std::string_view SimpleVar::String() const {
   return v_;
 }
 
-string SimpleVar::DebugString() const {
+std::string SimpleVar::DebugString() const {
   return v_;
 }
 
@@ -151,14 +151,14 @@ RecursiveVar::RecursiveVar(Value* v,
                            VarOrigin origin,
                            Frame* definition,
                            Loc loc,
-                           StringPiece orig)
+                           std::string_view orig)
     : Var(origin, definition, loc), v_(v), orig_(orig) {}
 
 bool RecursiveVar::IsFunc(Evaluator* ev) const {
   return v_->IsFunc(ev);
 }
 
-void RecursiveVar::Eval(Evaluator* ev, string* s) const {
+void RecursiveVar::Eval(Evaluator* ev, std::string* s) const {
   ev->CheckStack();
   v_->Eval(ev, s);
 }
@@ -182,11 +182,11 @@ void RecursiveVar::Used(Evaluator* ev, const Symbol& sym) const {
   Var::Used(ev, sym);
 }
 
-StringPiece RecursiveVar::String() const {
+std::string_view RecursiveVar::String() const {
   return orig_;
 }
 
-string RecursiveVar::DebugString() const {
+std::string RecursiveVar::DebugString() const {
   return Value::DebugString(v_);
 }
 
@@ -196,19 +196,19 @@ bool UndefinedVar::IsFunc(Evaluator*) const {
   return false;
 }
 
-void UndefinedVar::Eval(Evaluator*, string*) const {
+void UndefinedVar::Eval(Evaluator*, std::string*) const {
   // Nothing to do.
 }
 
-StringPiece UndefinedVar::String() const {
-  return StringPiece("");
+std::string_view UndefinedVar::String() const {
+  return std::string_view("");
 }
 
-string UndefinedVar::DebugString() const {
+std::string UndefinedVar::DebugString() const {
   return "*undefined*";
 }
 
-VariableNamesVar::VariableNamesVar(StringPiece name, bool all)
+VariableNamesVar::VariableNamesVar(std::string_view name, bool all)
     : name_(name), all_(all) {
   SetReadOnly();
   SetAssignOp(AssignOp::COLON_EQ);
@@ -218,38 +218,41 @@ bool VariableNamesVar::IsFunc(Evaluator*) const {
   return false;
 }
 
-void VariableNamesVar::Eval(Evaluator* ev, string* s) const {
+void VariableNamesVar::Eval(Evaluator* ev, std::string* s) const {
   ConcatVariableNames(ev, s);
 }
 
-StringPiece VariableNamesVar::String() const {
+std::string_view VariableNamesVar::String() const {
   return name_;
 }
 
-void VariableNamesVar::ConcatVariableNames(Evaluator* ev, string* s) const {
+void VariableNamesVar::ConcatVariableNames(Evaluator* ev,
+                                           std::string* s) const {
   WordWriter ww(s);
-  vector<StringPiece>&& symbols = GetSymbolNames([=](Var* var) -> bool {
-    if (var->Obsolete()) {
-      return false;
-    }
-    if (!all_) {
-      if (var->IsFunc(ev)) {
-        return false;
-      }
-    }
-    return true;
-  });
+  std::vector<std::string_view>&& symbols =
+      GetSymbolNames([=](Var* var) -> bool {
+        if (var->Obsolete()) {
+          return false;
+        }
+        if (!all_) {
+          if (var->IsFunc(ev)) {
+            return false;
+          }
+        }
+        return true;
+      });
   for (auto entry : symbols) {
     ww.Write(entry);
   }
 }
 
-string VariableNamesVar::DebugString() const {
+std::string VariableNamesVar::DebugString() const {
   return "*VariableNamesVar*";
 }
 
 bool ShellStatusVar::is_set_ = false;
 int ShellStatusVar::shell_status_ = 0;
+std::string ShellStatusVar::shell_status_string_;
 
 ShellStatusVar::ShellStatusVar() {
   SetReadOnly();
@@ -257,8 +260,11 @@ ShellStatusVar::ShellStatusVar() {
 }
 
 void ShellStatusVar::SetValue(int newShellStatus) {
-  shell_status_ = newShellStatus;
-  is_set_ = true;
+  if (!is_set_ || shell_status_ != newShellStatus) {
+    shell_status_ = newShellStatus;
+    is_set_ = true;
+    shell_status_string_.clear();
+  }
 }
 
 bool ShellStatusVar::IsDefined() const {
@@ -269,7 +275,7 @@ bool ShellStatusVar::IsFunc(Evaluator*) const {
   return false;
 }
 
-void ShellStatusVar::Eval(Evaluator* ev, string* s) const {
+void ShellStatusVar::Eval(Evaluator* ev, std::string* s) const {
   if (ev->IsEvaluatingCommand()) {
     ev->Error("Kati does not support using .SHELLSTATUS inside of a rule");
   }
@@ -278,18 +284,22 @@ void ShellStatusVar::Eval(Evaluator* ev, string* s) const {
     return;
   }
 
-  *s += std::to_string(shell_status_);
+  *s += String();
 }
 
-StringPiece ShellStatusVar::String() const {
+std::string_view ShellStatusVar::String() const {
   if (!is_set_) {
     return "";
   }
 
-  return std::to_string(shell_status_);
+  if (shell_status_string_.empty()) {
+    shell_status_string_ = std::to_string(shell_status_);
+  }
+
+  return shell_status_string_;
 }
 
-string ShellStatusVar::DebugString() const {
+std::string ShellStatusVar::DebugString() const {
   return "*ShellStatusVar*";
 }
 

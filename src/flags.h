@@ -16,13 +16,11 @@
 #define FLAGS_H_
 
 #include <string>
+#include <string_view>
 #include <vector>
 
-#include "string_piece.h"
 #include "strutil.h"
 #include "symtab.h"
-
-using namespace std;
 
 struct Flags {
   bool detect_android_echo;
@@ -77,11 +75,11 @@ struct Flags {
   int num_cpus;
   int num_jobs;
   int remote_num_jobs;
-  vector<const char*> subkati_args;
-  vector<Symbol> targets;
-  vector<StringPiece> cl_vars;
-  vector<string> writable;
-  vector<Pattern> traced_variables_pattern;
+  std::vector<const char*> subkati_args;
+  std::vector<Symbol> targets;
+  std::vector<std::string_view> cl_vars;
+  std::vector<std::string> writable;
+  std::vector<Pattern> traced_variables_pattern;
 
   void Parse(int argc, char** argv);
 };

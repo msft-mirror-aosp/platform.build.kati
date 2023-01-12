@@ -22,6 +22,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <string_view>
+
 #include "affinity.h"
 #include "eval.h"
 #include "exec.h"
@@ -37,7 +39,6 @@
 #include "regen.h"
 #include "stats.h"
 #include "stmt.h"
-#include "string_piece.h"
 #include "stringprintf.h"
 #include "strutil.h"
 #include "symtab.h"
@@ -49,9 +50,9 @@ extern "C" const char* __asan_default_options() {
   return "detect_leaks=0:allow_user_segv_handler=1";
 }
 
-static void ReadBootstrapMakefile(const vector<Symbol>& targets,
-                                  vector<Stmt*>* stmts) {
-  string bootstrap =
+static void ReadBootstrapMakefile(const std::vector<Symbol>& targets,
+                                  std::vector<Stmt*>* stmts) {
+  std::string bootstrap =
       ("CC?=cc\n"
 #if defined(__APPLE__)
        "CXX?=c++\n"
@@ -98,14 +99,14 @@ static void ReadBootstrapMakefile(const vector<Symbol>& targets,
   Parse(Intern(bootstrap).str(), Loc("*bootstrap*", 0), stmts);
 }
 
-static void SetVar(StringPiece l,
+static void SetVar(std::string_view l,
                    VarOrigin origin,
                    Frame* definition,
                    Loc loc) {
   size_t found = l.find('=');
-  CHECK(found != string::npos);
+  CHECK(found != std::string::npos);
   Symbol lhs = Intern(l.substr(0, found));
-  StringPiece rhs = l.substr(found + 1);
+  std::string_view rhs = l.substr(found + 1);
   lhs.SetGlobalVar(new RecursiveVar(Value::NewLiteral(rhs.data()), origin,
                                     definition, loc, rhs.data()));
 }
@@ -203,9 +204,9 @@ SegfaultHandler::~SegfaultHandler() {
   global_handler = nullptr;
 }
 
-static int Run(const vector<Symbol>& targets,
-               const vector<StringPiece>& cl_vars,
-               const string& orig_args) {
+static int Run(const std::vector<Symbol>& targets,
+               const std::vector<std::string_view>& cl_vars,
+               const std::string& orig_args) {
   double start_time = GetTime();
 
   if (g_flags.generate_ninja && (g_flags.regen || g_flags.dump_kati_stamp)) {
@@ -236,7 +237,7 @@ static int Run(const vector<Symbol>& targets,
   }
   SegfaultHandler segfault(&ev);
 
-  vector<Stmt*> bootstrap_asts;
+  std::vector<Stmt*> bootstrap_asts;
   ReadBootstrapMakefile(targets, &bootstrap_asts);
 
   {
@@ -251,8 +252,8 @@ static int Run(const vector<Symbol>& targets,
   {
     ScopedFrame frame(ev.Enter(FrameType::PHASE, "*command line*", Loc()));
     ev.in_command_line();
-    for (StringPiece l : cl_vars) {
-      vector<Stmt*> asts;
+    for (std::string_view l : cl_vars) {
+      std::vector<Stmt*> asts;
       Parse(Intern(l).str(), Loc("*bootstrap*", 0), &asts);
       CHECK(asts.size() == 1);
       asts[0]->Eval(&ev);
@@ -282,7 +283,7 @@ static int Run(const vector<Symbol>& targets,
     ev.DumpIncludeJSON(std::string(g_flags.dump_include_graph));
   }
 
-  vector<NamedDepNode> nodes;
+  std::vector<NamedDepNode> nodes;
   {
     ScopedFrame frame(
         ev.Enter(FrameType::PHASE, "*dependency analysis*", Loc()));
@@ -306,7 +307,7 @@ static int Run(const vector<Symbol>& targets,
     const Symbol name = p.first;
     if (p.second) {
       Var* v = ev.LookupVar(name);
-      const string&& value = v->Eval(&ev);
+      const std::string&& value = v->Eval(&ev);
       LOG("setenv(%s, %s)", name.c_str(), value.c_str());
       setenv(name.c_str(), value.c_str(), 1);
     } else {
@@ -357,7 +358,7 @@ int main(int argc, char* argv[]) {
     HandleRealpath(argc - 2, argv + 2);
     return 0;
   }
-  string orig_args;
+  std::string orig_args;
   for (int i = 0; i < argc; i++) {
     if (i)
       orig_args += ' ';

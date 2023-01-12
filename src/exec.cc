@@ -21,6 +21,7 @@
 #include <sys/wait.h>
 
 #include <memory>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -32,7 +33,6 @@
 #include "fileutil.h"
 #include "flags.h"
 #include "log.h"
-#include "string_piece.h"
 #include "strutil.h"
 #include "symtab.h"
 #include "var.h"
@@ -105,7 +105,7 @@ class Executor {
         fflush(stdout);
       }
       if (!g_flags.is_dry_run) {
-        string out;
+        std::string out;
         int result = RunCommand(shell_, shellflag_, command.cmd.c_str(),
                                 RedirectStderr::STDOUT, &out);
         printf("%s", out.c_str());
@@ -130,15 +130,15 @@ class Executor {
 
  private:
   CommandEvaluator ce_;
-  unordered_map<Symbol, double> done_;
-  string shell_;
-  string shellflag_;
+  std::unordered_map<Symbol, double> done_;
+  std::string shell_;
+  std::string shellflag_;
   uint64_t num_commands_;
 };
 
 }  // namespace
 
-void Exec(const vector<NamedDepNode>& roots, Evaluator* ev) {
+void Exec(const std::vector<NamedDepNode>& roots, Evaluator* ev) {
   Executor executor(ev);
   for (auto const& root : roots) {
     executor.ExecNode(*root.second, nullptr);
