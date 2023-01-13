@@ -16,19 +16,17 @@
 #define EXPR_H_
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "loc.h"
-#include "string_piece.h"
-
-using namespace std;
 
 class Evaluator;
 
 class Evaluable {
  public:
-  virtual void Eval(Evaluator* ev, string* s) const = 0;
-  string Eval(Evaluator*) const;
+  virtual void Eval(Evaluator* ev, std::string* s) const = 0;
+  std::string Eval(Evaluator*) const;
   const Loc& Location() const { return loc_; }
   // Whether this Evaluable is either knowably a function (e.g. one of the
   // built-ins) or likely to be a function-type macro (i.e. one that has
@@ -55,19 +53,19 @@ class Value : public Evaluable {
   // All NewExpr calls take ownership of the Value instances.
   static Value* NewExpr(const Loc& loc, Value* v1, Value* v2);
   static Value* NewExpr(const Loc& loc, Value* v1, Value* v2, Value* v3);
-  static Value* NewExpr(const Loc& loc, vector<Value*>* values);
+  static Value* NewExpr(const Loc& loc, std::vector<Value*>* values);
 
-  static Value* NewLiteral(StringPiece s);
+  static Value* NewLiteral(std::string_view s);
   virtual ~Value();
   virtual bool IsLiteral() const { return false; }
   // Only safe after IsLiteral() returns true.
-  virtual StringPiece GetLiteralValueUnsafe() const { return ""; }
+  virtual std::string_view GetLiteralValueUnsafe() const { return ""; }
 
-  static string DebugString(const Value*);
+  static std::string DebugString(const Value*);
 
  protected:
   Value(const Loc& loc);
-  virtual string DebugString_() const = 0;
+  virtual std::string DebugString_() const = 0;
 };
 
 enum struct ParseExprOpt {
@@ -78,15 +76,15 @@ enum struct ParseExprOpt {
 };
 
 Value* ParseExprImpl(Loc* loc,
-                     StringPiece s,
+                     std::string_view s,
                      const char* terms,
                      ParseExprOpt opt,
                      size_t* index_out,
                      bool trim_right_space = false);
 Value* ParseExpr(Loc* loc,
-                 StringPiece s,
+                 std::string_view s,
                  ParseExprOpt opt = ParseExprOpt::NORMAL);
 
-string JoinValues(const vector<Value*>& vals, const char* sep);
+std::string JoinValues(const std::vector<Value*>& vals, const char* sep);
 
 #endif  // EXPR_H_

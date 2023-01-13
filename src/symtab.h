@@ -18,13 +18,10 @@
 #include <bitset>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
-#include "string_piece.h"
-
-using namespace std;
-
-extern vector<string*>* g_symbols;
+extern std::vector<std::string*>* g_symbols;
 
 class Symtab;
 class Var;
@@ -33,7 +30,7 @@ class Symbol {
  public:
   explicit Symbol() : v_(-1) {}
 
-  const string& str() const { return *((*g_symbols)[v_]); }
+  const std::string& str() const { return *((*g_symbols)[v_]); }
 
   const char* c_str() const { return str().c_str(); }
 
@@ -42,7 +39,7 @@ class Symbol {
   int val() const { return v_; }
 
   char get(size_t i) const {
-    const string& s = str();
+    const std::string& s = str();
     if (i >= s.size())
       return 0;
     return s[i];
@@ -221,11 +218,12 @@ extern Symbol kShellSym;
 extern Symbol kAllowRulesSym;
 extern Symbol kKatiReadonlySym;
 
-Symbol Intern(StringPiece s);
+Symbol Intern(std::string_view s);
 
-string JoinSymbols(const vector<Symbol>& syms, const char* sep);
+std::string JoinSymbols(const std::vector<Symbol>& syms, const char* sep);
 
 // Get all symbol names for which filter returns true.
-vector<StringPiece> GetSymbolNames(std::function<bool(Var*)> const& filter);
+std::vector<std::string_view> GetSymbolNames(
+    std::function<bool(Var*)> const& filter);
 
 #endif  // SYMTAB_H_

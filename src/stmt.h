@@ -16,13 +16,11 @@
 #define STMT_H_
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "loc.h"
-#include "string_piece.h"
 #include "symtab.h"
-
-using namespace std;
 
 class Evaluator;
 class Value;
@@ -53,19 +51,19 @@ struct Stmt {
 
   Loc loc() const { return loc_; }
   void set_loc(Loc loc) { loc_ = loc; }
-  StringPiece orig() const { return orig_; }
+  std::string_view orig() const { return orig_; }
 
   void Eval(Evaluator*) const;
   virtual void EvalStatement(Evaluator* ev) const = 0;
 
-  virtual string DebugString() const = 0;
+  virtual std::string DebugString() const = 0;
 
  protected:
   Stmt();
 
  private:
   Loc loc_;
-  StringPiece orig_;
+  std::string_view orig_;
 };
 
 /* Parsed "rule statement" before evaluation is kept as
@@ -84,13 +82,13 @@ struct RuleStmt : public Stmt {
 
   virtual void EvalStatement(Evaluator* ev) const;
 
-  virtual string DebugString() const;
+  virtual std::string DebugString() const;
 };
 
 struct AssignStmt : public Stmt {
   Value* lhs;
   Value* rhs;
-  StringPiece orig_rhs;
+  std::string_view orig_rhs;
   AssignOp op;
   AssignDirective directive;
   bool is_final;
@@ -100,7 +98,7 @@ struct AssignStmt : public Stmt {
 
   virtual void EvalStatement(Evaluator* ev) const;
 
-  virtual string DebugString() const;
+  virtual std::string DebugString() const;
 
   Symbol GetLhsSymbol(Evaluator* ev) const;
 
@@ -110,27 +108,27 @@ struct AssignStmt : public Stmt {
 
 struct CommandStmt : public Stmt {
   Value* expr;
-  StringPiece orig;
+  std::string_view orig;
 
   virtual ~CommandStmt();
 
   virtual void EvalStatement(Evaluator* ev) const;
 
-  virtual string DebugString() const;
+  virtual std::string DebugString() const;
 };
 
 struct IfStmt : public Stmt {
   CondOp op;
   Value* lhs;
   Value* rhs;
-  vector<Stmt*> true_stmts;
-  vector<Stmt*> false_stmts;
+  std::vector<Stmt*> true_stmts;
+  std::vector<Stmt*> false_stmts;
 
   virtual ~IfStmt();
 
   virtual void EvalStatement(Evaluator* ev) const;
 
-  virtual string DebugString() const;
+  virtual std::string DebugString() const;
 };
 
 struct IncludeStmt : public Stmt {
@@ -141,7 +139,7 @@ struct IncludeStmt : public Stmt {
 
   virtual void EvalStatement(Evaluator* ev) const;
 
-  virtual string DebugString() const;
+  virtual std::string DebugString() const;
 };
 
 struct ExportStmt : public Stmt {
@@ -152,17 +150,17 @@ struct ExportStmt : public Stmt {
 
   virtual void EvalStatement(Evaluator* ev) const;
 
-  virtual string DebugString() const;
+  virtual std::string DebugString() const;
 };
 
 struct ParseErrorStmt : public Stmt {
-  string msg;
+  std::string msg;
 
   virtual ~ParseErrorStmt();
 
   virtual void EvalStatement(Evaluator* ev) const;
 
-  virtual string DebugString() const;
+  virtual std::string DebugString() const;
 };
 
 #endif  // STMT_H_

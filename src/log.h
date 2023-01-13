@@ -24,10 +24,10 @@
 #include "log.h"
 #include "stringprintf.h"
 
-using namespace std;
-
 extern bool g_log_no_exit;
-extern string* g_last_error;
+extern std::string* g_last_error;
+
+#define SPF(s) static_cast<int>((s).size()), (s).data()
 
 // Useful for logging-only arguments.
 #define UNUSED __attribute__((unused))
@@ -76,7 +76,7 @@ extern string* g_last_error;
       fprintf(stderr, "%s\n", StringPrintf(__VA_ARGS__).c_str()); \
       exit(1);                                                    \
     }                                                             \
-    g_last_error = new string(StringPrintf(__VA_ARGS__));         \
+    g_last_error = new std::string(StringPrintf(__VA_ARGS__));    \
   } while (0)
 
 #define CHECK(c) \

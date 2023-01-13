@@ -29,8 +29,8 @@ Evaluable::Evaluable(const Loc& loc) : loc_(loc) {}
 
 Evaluable::~Evaluable() {}
 
-string Evaluable::Eval(Evaluator* ev) const {
-  string s;
+std::string Evaluable::Eval(Evaluator* ev) const {
+  std::string s;
   Eval(ev, &s);
   return s;
 }
@@ -39,30 +39,30 @@ Value::Value(const Loc& loc) : Evaluable(loc) {}
 
 Value::~Value() {}
 
-string Value::DebugString(const Value* v) {
+std::string Value::DebugString(const Value* v) {
   return v ? NoLineBreak(v->DebugString_()) : "(null)";
 }
 
 class Literal : public Value {
  public:
-  explicit Literal(StringPiece s) : Value(Loc()), s_(s) {}
+  explicit Literal(std::string_view s) : Value(Loc()), s_(s) {}
 
-  StringPiece val() const { return s_; }
+  std::string_view val() const { return s_; }
 
   virtual bool IsFunc(Evaluator*) const override { return false; }
 
-  virtual void Eval(Evaluator* ev, string* s) const override {
+  virtual void Eval(Evaluator* ev, std::string* s) const override {
     ev->CheckStack();
     s->append(s_.begin(), s_.end());
   }
 
   virtual bool IsLiteral() const override { return true; }
-  virtual StringPiece GetLiteralValueUnsafe() const override { return s_; }
+  virtual std::string_view GetLiteralValueUnsafe() const override { return s_; }
 
-  virtual string DebugString_() const override { return s_.as_string(); }
+  virtual std::string DebugString_() const override { return std::string(s_); }
 
  private:
-  StringPiece s_;
+  std::string_view s_;
 };
 
 class ValueList : public Value {
@@ -82,7 +82,7 @@ class ValueList : public Value {
     vals_.push_back(v2);
   }
 
-  ValueList(const Loc& loc, vector<Value*>* values) : ValueList(loc) {
+  ValueList(const Loc& loc, std::vector<Value*>* values) : ValueList(loc) {
     values->shrink_to_fit();
     values->swap(vals_);
   }
@@ -102,15 +102,15 @@ class ValueList : public Value {
     return false;
   }
 
-  virtual void Eval(Evaluator* ev, string* s) const override {
+  virtual void Eval(Evaluator* ev, std::string* s) const override {
     ev->CheckStack();
     for (Value* v : vals_) {
       v->Eval(ev, s);
     }
   }
 
-  virtual string DebugString_() const override {
-    string r;
+  virtual std::string DebugString_() const override {
+    std::string r;
     for (Value* v : vals_) {
       if (r.empty()) {
         r += "ValueList(";
@@ -125,7 +125,7 @@ class ValueList : public Value {
   }
 
  private:
-  vector<Value*> vals_;
+  std::vector<Value*> vals_;
 };
 
 class SymRef : public Value {
@@ -141,7 +141,7 @@ class SymRef : public Value {
     return IsInteger(name_.str());
   }
 
-  virtual void Eval(Evaluator* ev, string* s) const override {
+  virtual void Eval(Evaluator* ev, std::string* s) const override {
     ev->CheckStack();
     Var* v = ev->LookupVarForEval(name_);
     v->Used(ev, name_);
@@ -149,7 +149,7 @@ class SymRef : public Value {
     ev->VarEvalComplete(name_);
   }
 
-  virtual string DebugString_() const override {
+  virtual std::string DebugString_() const override {
     return StringPrintf("SymRef(%s)", name_.c_str());
   }
 
@@ -167,10 +167,10 @@ class VarRef : public Value {
     return true;
   }
 
-  virtual void Eval(Evaluator* ev, string* s) const override {
+  virtual void Eval(Evaluator* ev, std::string* s) const override {
     ev->CheckStack();
     ev->IncrementEvalDepth();
-    const string&& name = name_->Eval(ev);
+    const std::string&& name = name_->Eval(ev);
     ev->DecrementEvalDepth();
     Symbol sym = Intern(name);
     Var* v = ev->LookupVarForEval(sym);
@@ -179,7 +179,7 @@ class VarRef : public Value {
     ev->VarEvalComplete(sym);
   }
 
-  virtual string DebugString_() const override {
+  virtual std::string DebugString_() const override {
     return StringPrintf("VarRef(%s)", Value::DebugString(name_).c_str());
   }
 
@@ -201,26 +201,26 @@ class VarSubst : public Value {
     return name_->IsFunc(ev) || pat_->IsFunc(ev) || subst_->IsFunc(ev);
   }
 
-  virtual void Eval(Evaluator* ev, string* s) const override {
+  virtual void Eval(Evaluator* ev, std::string* s) const override {
     ev->CheckStack();
     ev->IncrementEvalDepth();
-    const string&& name = name_->Eval(ev);
+    const std::string&& name = name_->Eval(ev);
     Symbol sym = Intern(name);
     Var* v = ev->LookupVar(sym);
-    const string&& pat_str = pat_->Eval(ev);
-    const string&& subst = subst_->Eval(ev);
+    const std::string&& pat_str = pat_->Eval(ev);
+    const std::string&& subst = subst_->Eval(ev);
     ev->DecrementEvalDepth();
     v->Used(ev, sym);
-    const string&& value = v->Eval(ev);
+    const std::string&& value = v->Eval(ev);
     WordWriter ww(s);
     Pattern pat(pat_str);
-    for (StringPiece tok : WordScanner(value)) {
+    for (std::string_view tok : WordScanner(value)) {
       ww.MaybeAddWhitespace();
       pat.AppendSubstRef(tok, subst, s);
     }
   }
 
-  virtual string DebugString_() const override {
+  virtual std::string DebugString_() const override {
     return StringPrintf("VarSubst(%s:%s=%s)", Value::DebugString(name_).c_str(),
                         Value::DebugString(pat_).c_str(),
                         Value::DebugString(subst_).c_str());
@@ -243,7 +243,7 @@ class Func : public Value {
 
   virtual bool IsFunc(Evaluator*) const override { return true; }
 
-  virtual void Eval(Evaluator* ev, string* s) const override {
+  virtual void Eval(Evaluator* ev, std::string* s) const override {
     ScopedFrame frame(ev->Enter(FrameType::FUNCALL, fi_->name, Location()));
     ev->CheckStack();
     LOG("Invoke func %s(%s)", name(), JoinValues(args_, ",").c_str());
@@ -252,7 +252,7 @@ class Func : public Value {
     ev->DecrementEvalDepth();
   }
 
-  virtual string DebugString_() const override {
+  virtual std::string DebugString_() const override {
     return StringPrintf("Func(%s %s)", fi_->name,
                         JoinValues(args_, ",").c_str());
   }
@@ -267,7 +267,7 @@ class Func : public Value {
 
  private:
   const FuncInfo* fi_;
-  vector<Value*> args_;
+  std::vector<Value*> args_;
 };
 
 static char CloseParen(char c) {
@@ -280,7 +280,7 @@ static char CloseParen(char c) {
   return 0;
 }
 
-static size_t SkipSpaces(Loc* loc, StringPiece s, const char* terms) {
+static size_t SkipSpaces(Loc* loc, std::string_view s, const char* terms) {
   for (size_t i = 0; i < s.size(); i++) {
     char c = s[i];
     if (strchr(terms, c)) {
@@ -292,7 +292,7 @@ static size_t SkipSpaces(Loc* loc, StringPiece s, const char* terms) {
         return i;
       }
 
-      char n = s.get(i + 1);
+      char n = i + 1 < s.size() ? s[i + 1] : 0;
       if (n != '\r' && n != '\n') {
         return i;
       }
@@ -311,7 +311,7 @@ Value* Value::NewExpr(const Loc& loc, Value* v1, Value* v2, Value* v3) {
   return new ValueList(loc, v1, v2, v3);
 }
 
-Value* Value::NewExpr(const Loc& loc, vector<Value*>* values) {
+Value* Value::NewExpr(const Loc& loc, std::vector<Value*>* values) {
   if (values->size() == 1) {
     Value* v = (*values)[0];
     values->clear();
@@ -320,7 +320,7 @@ Value* Value::NewExpr(const Loc& loc, vector<Value*>* values) {
   return new ValueList(loc, values);
 }
 
-Value* Value::NewLiteral(StringPiece s) {
+Value* Value::NewLiteral(std::string_view s) {
   return new Literal(s);
 }
 
@@ -330,7 +330,7 @@ bool ShouldHandleComments(ParseExprOpt opt) {
 
 void ParseFunc(Loc* loc,
                Func* f,
-               StringPiece s,
+               std::string_view s,
                size_t i,
                char* terms,
                size_t* index_out) {
@@ -356,7 +356,7 @@ void ParseFunc(Loc* loc,
         }
 
         if (s[i] == '\\') {
-          char c = s.get(i + 1);
+          char c = i + 1 < s.size() ? s[i + 1] : 0;
           if (c == '\r' || c == '\n') {
             loc->lineno++;
             continue;
@@ -401,7 +401,7 @@ void ParseFunc(Loc* loc,
   return;
 }
 
-Value* ParseDollar(Loc* loc, StringPiece s, size_t* index_out) {
+Value* ParseDollar(Loc* loc, std::string_view s, size_t* index_out) {
   CHECK(s.size() >= 2);
   CHECK(s[0] == '$');
   CHECK(s[1] != '$');
@@ -427,7 +427,7 @@ Value* ParseDollar(Loc* loc, StringPiece s, size_t* index_out) {
         Symbol sym = Intern(lit->val());
         if (g_flags.enable_kati_warnings) {
           size_t found = sym.str().find_first_of(" ({");
-          if (found != string::npos) {
+          if (found != std::string::npos) {
             KATI_WARN_LOC(start_loc,
                           "*warning*: variable lookup with '%c': %.*s",
                           sym.str()[found], SPF(s));
@@ -489,7 +489,7 @@ Value* ParseDollar(Loc* loc, StringPiece s, size_t* index_out) {
     // GNU make accepts expressions like $((). See unmatched_paren*.mk
     // for detail.
     size_t found = s.find(cp);
-    if (found != string::npos) {
+    if (found != std::string::npos) {
       KATI_WARN_LOC(start_loc, "*warning*: unmatched parentheses: %.*s",
                     SPF(s));
       *index_out = s.size();
@@ -500,21 +500,21 @@ Value* ParseDollar(Loc* loc, StringPiece s, size_t* index_out) {
 }
 
 Value* ParseExprImpl(Loc* loc,
-                     StringPiece s,
+                     std::string_view s,
                      const char* terms,
                      ParseExprOpt opt,
                      size_t* index_out,
                      bool trim_right_space) {
   Loc list_loc = *loc;
 
-  if (s.get(s.size() - 1) == '\r')
+  if (!s.empty() && s.back() == '\r')
     s.remove_suffix(1);
 
   size_t b = 0;
   char save_paren = 0;
   int paren_depth = 0;
   size_t i;
-  vector<Value*> list;
+  std::vector<Value*> list;
   for (i = 0; i < s.size(); i++) {
     Loc item_loc = *loc;
 
@@ -544,14 +544,14 @@ Value* ParseExprImpl(Loc* loc,
         list.push_back(new Literal(s.substr(b, i - b)));
 
       if (s[i + 1] == '$') {
-        list.push_back(new Literal(StringPiece("$")));
+        list.push_back(new Literal(std::string_view("$")));
         i += 1;
         b = i + 1;
         continue;
       }
 
       if (terms && strchr(terms, s[i + 1])) {
-        list.push_back(new Literal(StringPiece("$")));
+        list.push_back(new Literal(std::string_view("$")));
         *index_out = i + 1;
         return Value::NewExpr(item_loc, &list);
       }
@@ -604,15 +604,16 @@ Value* ParseExprImpl(Loc* loc,
         if (i > b) {
           list.push_back(new Literal(TrimRightSpace(s.substr(b, i - b))));
         }
-        list.push_back(new Literal(StringPiece(" ")));
+        list.push_back(new Literal(std::string_view(" ")));
         // Skip the current escaped newline
         i += 2;
-        if (n == '\r' && s.get(i) == '\n') {
+        if (n == '\r' && i < s.size() && s[i] == '\n') {
           i++;
         }
         // Then continue skipping escaped newlines, spaces, and tabs
         for (; i < s.size(); i++) {
-          if (s[i] == '\\' && (s.get(i + 1) == '\r' || s.get(i + 1) == '\n')) {
+          if (s[i] == '\\' && i + 1 < s.size() &&
+              (s[i + 1] == '\r' || s[i + 1] == '\n')) {
             loc->lineno++;
             i++;
             continue;
@@ -628,7 +629,7 @@ Value* ParseExprImpl(Loc* loc,
   }
 
   if (i > b) {
-    StringPiece rest = s.substr(b, i - b);
+    std::string_view rest = s.substr(b, i - b);
     if (trim_right_space)
       rest = TrimRightSpace(rest);
     if (!rest.empty())
@@ -638,13 +639,13 @@ Value* ParseExprImpl(Loc* loc,
   return Value::NewExpr(list_loc, &list);
 }
 
-Value* ParseExpr(Loc* loc, StringPiece s, ParseExprOpt opt) {
+Value* ParseExpr(Loc* loc, std::string_view s, ParseExprOpt opt) {
   size_t n;
   return ParseExprImpl(loc, s, NULL, opt, &n);
 }
 
-string JoinValues(const vector<Value*>& vals, const char* sep) {
-  vector<string> val_strs;
+std::string JoinValues(const std::vector<Value*>& vals, const char* sep) {
+  std::vector<std::string> val_strs;
   val_strs.reserve(vals.size());
   for (Value* v : vals) {
     val_strs.push_back(Value::DebugString(v));
