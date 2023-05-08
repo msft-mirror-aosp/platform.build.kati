@@ -64,20 +64,16 @@ cc_library_host_static {
 cc_binary_host {
     name: "ckati",
     defaults: ["ckati_defaults"],
-    srcs: ["main.cc"],
+    srcs: [
+        "main.cc",
+        "regen_dump.cc",
+    ],
     whole_static_libs: ["libckati"],
     target: {
         linux_glibc: {
             shared_libs: ["libjemalloc5"],
         },
     },
-}
-
-cc_binary_host {
-    name: "ckati_stamp_dump",
-    defaults: ["ckati_defaults"],
-    srcs: ["regen_dump.cc"],
-    static_libs: ["libckati"],
 }
 
 cc_test_host {
