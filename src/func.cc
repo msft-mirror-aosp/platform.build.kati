@@ -794,9 +794,9 @@ void ErrorFunc(const std::vector<Value*>& args, Evaluator* ev, std::string*) {
 }
 
 static void FileReadFunc_(Evaluator* ev,
-                         const std::string& filename,
-                         std::string* s,
-                         bool rerun) {
+                          const std::string& filename,
+                          std::string* s,
+                          bool rerun) {
   int fd = open(filename.c_str(), O_RDONLY);
   if (fd < 0) {
     if (errno == ENOENT) {
@@ -845,10 +845,10 @@ static void FileReadFunc_(Evaluator* ev,
 }
 
 static void FileWriteFunc_(Evaluator* ev,
-                          const std::string& filename,
-                          bool append,
-                          std::string text,
-                          bool rerun) {
+                           const std::string& filename,
+                           bool append,
+                           std::string text,
+                           bool rerun) {
   FILE* f = fopen(filename.c_str(), append ? "ab" : "wb");
   if (f == NULL) {
     ev->Error("*** fopen failed.");
@@ -872,7 +872,10 @@ static void FileWriteFunc_(Evaluator* ev,
   }
 }
 
-void FileFunc_(const std::vector<Value*>& args, Evaluator* ev, std::string* s, bool rerun) {
+void FileFunc_(const std::vector<Value*>& args,
+               Evaluator* ev,
+               std::string* s,
+               bool rerun) {
   if (ev->avoid_io()) {
     ev->Error("*** $(file ...) is not supported in rules.");
   }
@@ -926,7 +929,9 @@ void FileFunc(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
   FileFunc_(args, ev, s, true);
 }
 
-void FileFuncNoRerun(const std::vector<Value*>& args, Evaluator* ev, std::string* s) {
+void FileFuncNoRerun(const std::vector<Value*>& args,
+                     Evaluator* ev,
+                     std::string* s) {
   FileFunc_(args, ev, s, false);
 }
 
