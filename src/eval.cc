@@ -182,7 +182,7 @@ Evaluator::Evaluator()
 
 Evaluator::~Evaluator() {
   if (assignment_tracefile_ != nullptr && assignment_tracefile_ != stderr) {
-      fclose(assignment_tracefile_);
+    fclose(assignment_tracefile_);
   }
 
   // delete vars_;
